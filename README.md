@@ -32,6 +32,25 @@ npm run setup:run
 
 This runs setup, starts MongoDB, and starts all services.
 
+## Mock Data
+
+Create demo users/restaurants/orders/payments:
+
+```bash
+npm run seed
+```
+
+Reset restaurant/order/payment data and reseed:
+
+```bash
+npm run seed:reset
+```
+
+Demo login credentials:
+
+- `demo.user@campusfood.dev` / `demo12345`
+- `admin@campusfood.dev` / `demo12345`
+
 ## Useful Scripts
 
 - `npm run setup`: Install all dependencies + create missing `.env` files.
@@ -39,5 +58,8 @@ This runs setup, starts MongoDB, and starts all services.
 - `npm run db:start`: Start local MongoDB in Docker container `campus-food-mongo`.
 - `npm run db:stop`: Stop the MongoDB Docker container.
 - `npm run db:status`: Check MongoDB container status.
+- `npm run seed`: Add/update demo data.
+- `npm run seed:reset`: Clear restaurant/order/payment data and reseed.
 - `npm run dev`: Run all services and frontend in parallel (dev mode).
 - `npm run dev:with-db`: Start MongoDB then run all services.
+- `npm run setup:demo`: Setup + start DB + seed data + run all services.
