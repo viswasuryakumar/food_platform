@@ -10,12 +10,7 @@ const Payment = require("./models/Payment");
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// Connect to DB
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("Payment DB Connected"))
-  .catch((err) => console.log("DB Error:", err));
+mongoose.set("bufferCommands", false);
 
 
 // -------- MAKE PAYMENT --------
@@ -78,6 +73,20 @@ app.get("/payments/history", async (req, res) => {
 
 
 
-app.listen(process.env.PORT, () =>
-  console.log(`Payment Service running on port ${process.env.PORT}`)
-);
+async function startServer() {
+  try {
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 3000,
+    });
+    console.log("Payment DB Connected");
+
+    app.listen(process.env.PORT, () =>
+      console.log(`Payment Service running on port ${process.env.PORT}`)
+    );
+  } catch (err) {
+    console.error("Fatal DB Error:", err.message);
+    process.exit(1);
+  }
+}
+
+startServer();

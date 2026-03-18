@@ -10,12 +10,7 @@ const User = require("./models/User"); // Our User model
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// ---------- DATABASE CONNECTION ----------
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("User DB Connected"))
-  .catch((err) => console.log("DB Error:", err));
+mongoose.set("bufferCommands", false);
 
 
 // ---------- REGISTER ROUTE ----------
@@ -65,8 +60,21 @@ app.get("/", (req, res) => {
   res.send("User Service Running");
 });
 
-// Start server
-app.listen(process.env.PORT, () =>
-  console.log(`User Service running on ${process.env.PORT}`)
-);
+async function startServer() {
+  try {
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 3000,
+    });
+    console.log("User DB Connected");
+
+    app.listen(process.env.PORT, () =>
+      console.log(`User Service running on ${process.env.PORT}`)
+    );
+  } catch (err) {
+    console.error("Fatal DB Error:", err.message);
+    process.exit(1);
+  }
+}
+
+startServer();
     

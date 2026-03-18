@@ -9,12 +9,7 @@ const MenuItem = require("./models/MenuItem");
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// Connect to DB
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("Restaurant DB Connected"))
-  .catch((err) => console.log("DB Error:", err));
+mongoose.set("bufferCommands", false);
 
 
 // --------- RESTAURANT ROUTES ---------
@@ -80,6 +75,20 @@ app.get("/restaurants/:id/menu", async (req, res) => {
   res.json(items);
 });
 
-app.listen(process.env.PORT, () =>
-  console.log(`Restaurant Service running on port ${process.env.PORT}`)
-);
+async function startServer() {
+  try {
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 3000,
+    });
+    console.log("Restaurant DB Connected");
+
+    app.listen(process.env.PORT, () =>
+      console.log(`Restaurant Service running on port ${process.env.PORT}`)
+    );
+  } catch (err) {
+    console.error("Fatal DB Error:", err.message);
+    process.exit(1);
+  }
+}
+
+startServer();

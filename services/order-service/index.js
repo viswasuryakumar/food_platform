@@ -10,12 +10,7 @@ const Order = require("./models/Order");
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// Connect to MongoDB
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("Order DB Connected"))
-  .catch((err) => console.log("DB Error:", err));
+mongoose.set("bufferCommands", false);
 
 // GET ALL ORDERS (ADMIN)
 app.get("/orders", async (req, res) => {
@@ -94,6 +89,20 @@ app.put("/orders/:id/status", async (req, res) => {
   }
 });
 
-app.listen(process.env.PORT, () =>
-  console.log(`Order Service running on port ${process.env.PORT}`)
-);
+async function startServer() {
+  try {
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 3000,
+    });
+    console.log("Order DB Connected");
+
+    app.listen(process.env.PORT, () =>
+      console.log(`Order Service running on port ${process.env.PORT}`)
+    );
+  } catch (err) {
+    console.error("Fatal DB Error:", err.message);
+    process.exit(1);
+  }
+}
+
+startServer();
