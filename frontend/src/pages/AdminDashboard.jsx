@@ -7,28 +7,19 @@ export default function AdminDashboard() {
 
   const [orders, setOrders] = useState([]);
   const [restaurants, setRestaurants] = useState([]);
-
-  // CREATE RESTAURANT STATES
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [cuisine, setCuisine] = useState("");
   const [menu, setMenu] = useState([]);
-
   const [itemName, setItemName] = useState("");
   const [itemPrice, setItemPrice] = useState("");
 
-  // ===========================
-  // FETCH DATA
-  // ===========================
   async function fetchOrders() {
     try {
-      const res = await axios.get(
-        "http://localhost:3000/api/orders",
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-      setOrders(res.data);
+      const res = await axios.get("http://localhost:3000/api/orders", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setOrders(res.data || []);
     } catch (err) {
       console.error("Fetch orders error:", err);
     }
@@ -36,57 +27,63 @@ export default function AdminDashboard() {
 
   async function fetchRestaurants() {
     try {
-      const res = await axios.get(
-        "http://localhost:3000/api/restaurants"
-      );
-      setRestaurants(res.data);
+      const res = await axios.get("http://localhost:3000/api/restaurants");
+      setRestaurants(res.data || []);
     } catch (err) {
       console.error("Fetch restaurants error:", err);
     }
   }
 
   useEffect(() => {
-    fetchOrders();
-    fetchRestaurants();
-  }, []);
+    let cancelled = false;
 
-  // ===========================
-  // ORDER STATUS UPDATE
-  // ===========================
+    async function bootstrapDashboard() {
+      try {
+        const [ordersRes, restaurantsRes] = await Promise.all([
+          axios.get("http://localhost:3000/api/orders", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get("http://localhost:3000/api/restaurants"),
+        ]);
+
+        if (cancelled) return;
+        setOrders(ordersRes.data || []);
+        setRestaurants(restaurantsRes.data || []);
+      } catch (err) {
+        console.error("Dashboard bootstrap error:", err);
+      }
+    }
+
+    bootstrapDashboard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
   async function updateStatus(orderId, status) {
     try {
       await axios.put(
         `http://localhost:3000/api/orders/${orderId}/status`,
         { status },
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
-
       fetchOrders();
     } catch (err) {
       console.error("Update status error:", err);
     }
   }
 
-  // ===========================
-  // MENU HANDLING
-  // ===========================
   function addMenuItem() {
     if (!itemName || !itemPrice) return;
 
-    setMenu([
-      ...menu,
-      { name: itemName, price: Number(itemPrice) }
-    ]);
-
+    setMenu([...menu, { name: itemName, price: Number(itemPrice) }]);
     setItemName("");
     setItemPrice("");
   }
 
-  // ===========================
-  // CREATE RESTAURANT
-  // ===========================
   async function createRestaurant() {
     try {
       await axios.post(
@@ -95,34 +92,26 @@ export default function AdminDashboard() {
           name,
           address,
           cuisine,
-          menu
+          menu,
         },
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
-
-      alert("Restaurant created!");
 
       setName("");
       setAddress("");
       setCuisine("");
       setMenu([]);
-
       fetchRestaurants();
-
     } catch (err) {
       console.error("Create restaurant error:", err);
-      alert("Failed to create restaurant");
+      alert("Failed to create restaurant.");
     }
   }
 
-  // ===========================
-  // UPDATE RESTAURANT
-  // ===========================
   async function updateRestaurant(id) {
     const newName = prompt("Enter new name");
-
     if (!newName) return;
 
     try {
@@ -130,204 +119,175 @@ export default function AdminDashboard() {
         `http://localhost:3000/api/restaurants/${id}`,
         { name: newName },
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
-
-      alert("Updated!");
       fetchRestaurants();
-
     } catch (err) {
-      console.error(err);
+      console.error("Update restaurant error:", err);
     }
   }
 
-  // ===========================
-  // DELETE RESTAURANT
-  // ===========================
   async function deleteRestaurant(id) {
     try {
-      await axios.delete(
-        `http://localhost:3000/api/restaurants/${id}`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-
-      alert("Deleted!");
+      await axios.delete(`http://localhost:3000/api/restaurants/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       fetchRestaurants();
-
     } catch (err) {
-      console.error(err);
+      console.error("Delete restaurant error:", err);
     }
   }
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
+    <section className="view-shell space-y-6">
+      <header className="surface p-6 md:p-7">
+        <p className="text-xs uppercase tracking-[0.2em] text-[#8a7c6d]">Admin</p>
+        <h1 className="title-display mt-2">Control Center</h1>
+        <p className="muted mt-2 text-sm">
+          Manage restaurants and keep order statuses updated for customers.
+        </p>
+      </header>
 
-      <h2 className="text-2xl font-bold mb-4">Admin Dashboard</h2>
-
-      {/* ================= CREATE RESTAURANT ================= */}
-      <div className="bg-white p-4 rounded-xl shadow-md mb-6">
-        <h3 className="font-bold mb-2">Create Restaurant</h3>
-
-        <input
-          placeholder="Name"
-          className="border p-2 mr-2"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-
-        <input
-          placeholder="Address"
-          className="border p-2 mr-2"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-        />
-
-        <input
-          placeholder="Cuisine"
-          className="border p-2 mr-2"
-          value={cuisine}
-          onChange={(e) => setCuisine(e.target.value)}
-        />
-
-        <br /><br />
-
-        <h4 className="font-semibold">Add Menu Item</h4>
-
-        <input
-          placeholder="Item Name"
-          className="border p-2 mr-2"
-          value={itemName}
-          onChange={(e) => setItemName(e.target.value)}
-        />
-
-        <input
-          placeholder="Price"
-          className="border p-2 mr-2"
-          value={itemPrice}
-          onChange={(e) => setItemPrice(e.target.value)}
-        />
-
-        <button
-          onClick={addMenuItem}
-          className="bg-blue-500 text-white px-3 py-1 rounded-md"
-        >
-          Add Item
-        </button>
-
-        <div className="mt-2">
-          {menu.map((m, i) => (
-  <div key={i} className="flex items-center gap-2 mt-1">
-
-    <input
-      value={m.name}
-      onChange={(e) => {
-        const updated = [...menu];
-        updated[i].name = e.target.value;
-        setMenu(updated);
-      }}
-      className="border p-1"
-    />
-
-    <input
-      value={m.price}
-      onChange={(e) => {
-        const updated = [...menu];
-        updated[i].price = Number(e.target.value);
-        setMenu(updated);
-      }}
-      className="border p-1 w-20"
-    />
-
-    <button
-      onClick={() => {
-        const updated = menu.filter((_, index) => index !== i);
-        setMenu(updated);
-      }}
-      className="bg-red-500 text-white px-2 rounded"
-    >
-      Delete
-    </button>
-
-  </div>
-))}
-        </div>
-
-        <button
-          onClick={createRestaurant}
-          className="mt-3 bg-green-500 text-white px-4 py-2 rounded-md"
-        >
-          Create Restaurant
-        </button>
-      </div>
-
-      {/* ================= RESTAURANTS LIST ================= */}
-      <h3 className="text-xl font-bold">Restaurants</h3>
-
-      {restaurants.map((rest) => (
-        <div key={rest._id} className="bg-white p-4 rounded-xl shadow-md mt-3">
-          <p><b>{rest.name}</b></p>
-          <p>{rest.address}</p>
-
-          <button
-            onClick={() => updateRestaurant(rest._id)}
-            className="bg-yellow-500 text-white px-2 py-1 mr-2 rounded"
-          >
-            Edit
-          </button>
-
-          <button
-            onClick={() => deleteRestaurant(rest._id)}
-            className="bg-red-500 text-white px-2 py-1 rounded"
-          >
-            Delete
-          </button>
-        </div>
-      ))}
-
-      {/* ================= ORDERS ================= */}
-      <h3 className="text-xl font-bold mt-6">Orders</h3>
-
-      {orders.map((order) => (
-        <div key={order._id} className="bg-white p-4 rounded-xl shadow-md mt-3">
-
-          <p><b>ID:</b> {order._id}</p>
-          <p><b>Status:</b> {order.status}</p>
-
-          {order.items.map((item, i) => (
-            <div key={i}>
-              {item.name} x {item.quantity}
-            </div>
-          ))}
-
-          <div className="mt-2">
-            <button
-              onClick={() => updateStatus(order._id, "preparing")}
-              className="bg-yellow-500 text-white px-2 py-1 mr-2 rounded"
-            >
-              Preparing
-            </button>
-
-            <button
-              onClick={() => updateStatus(order._id, "on-the-way")}
-              className="bg-blue-500 text-white px-2 py-1 mr-2 rounded"
-            >
-              On the way
-            </button>
-
-            <button
-              onClick={() => updateStatus(order._id, "delivered")}
-              className="bg-green-500 text-white px-2 py-1 rounded"
-            >
-              Delivered
-            </button>
+      <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+        <section className="surface p-6">
+          <h2 className="text-xl font-semibold">Create Restaurant</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <input
+              placeholder="Restaurant name"
+              className="input-field sm:col-span-2"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <input
+              placeholder="Address"
+              className="input-field sm:col-span-2"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+            <input
+              placeholder="Cuisine"
+              className="input-field sm:col-span-2"
+              value={cuisine}
+              onChange={(e) => setCuisine(e.target.value)}
+            />
           </div>
 
-        </div>
-      ))}
+          <div className="mt-5">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-[#6f6356]">Menu Items</h3>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <input
+                placeholder="Item name"
+                className="input-field min-w-[160px] flex-1"
+                value={itemName}
+                onChange={(e) => setItemName(e.target.value)}
+              />
+              <input
+                placeholder="Price"
+                type="number"
+                className="input-field w-28"
+                value={itemPrice}
+                onChange={(e) => setItemPrice(e.target.value)}
+              />
+              <button onClick={addMenuItem} className="btn-soft">
+                Add
+              </button>
+            </div>
 
-    </div>
+            <div className="mt-3 space-y-2">
+              {menu.map((m, i) => (
+                <div key={i} className="surface-soft flex items-center gap-2 p-2.5">
+                  <input
+                    value={m.name}
+                    onChange={(e) => {
+                      const updated = [...menu];
+                      updated[i].name = e.target.value;
+                      setMenu(updated);
+                    }}
+                    className="input-field"
+                  />
+                  <input
+                    value={m.price}
+                    type="number"
+                    onChange={(e) => {
+                      const updated = [...menu];
+                      updated[i].price = Number(e.target.value);
+                      setMenu(updated);
+                    }}
+                    className="input-field w-28"
+                  />
+                  <button
+                    onClick={() => setMenu(menu.filter((_, index) => index !== i))}
+                    className="btn-danger"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={createRestaurant} className="btn-primary mt-5 w-full">
+            Create Restaurant
+          </button>
+        </section>
+
+        <section className="space-y-6">
+          <div className="surface p-6">
+            <h2 className="text-xl font-semibold">Restaurants</h2>
+            <div className="mt-4 space-y-3">
+              {restaurants.map((rest) => (
+                <article key={rest._id} className="surface-soft p-3">
+                  <p className="font-semibold text-[#2f2922]">{rest.name}</p>
+                  <p className="muted text-sm">{rest.address}</p>
+                  <div className="mt-3 flex gap-2">
+                    <button onClick={() => updateRestaurant(rest._id)} className="btn-soft">
+                      Edit
+                    </button>
+                    <button onClick={() => deleteRestaurant(rest._id)} className="btn-danger">
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              ))}
+              {restaurants.length === 0 && <p className="muted text-sm">No restaurants yet.</p>}
+            </div>
+          </div>
+
+          <div className="surface p-6">
+            <h2 className="text-xl font-semibold">Orders</h2>
+            <div className="mt-4 space-y-3">
+              {orders.map((order) => (
+                <article key={order._id} className="surface-soft p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-[#75695d]">#{order._id}</p>
+                    <span className="status-pill">{order.status}</span>
+                  </div>
+                  <div className="mt-2 space-y-1 text-sm text-[#4a4036]">
+                    {order.items.map((item, i) => (
+                      <p key={i}>
+                        {item.name} x {item.quantity}
+                      </p>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button onClick={() => updateStatus(order._id, "preparing")} className="btn-soft">
+                      Preparing
+                    </button>
+                    <button onClick={() => updateStatus(order._id, "on-the-way")} className="btn-soft">
+                      On the way
+                    </button>
+                    <button onClick={() => updateStatus(order._id, "delivered")} className="btn-primary">
+                      Delivered
+                    </button>
+                  </div>
+                </article>
+              ))}
+              {orders.length === 0 && <p className="muted text-sm">No orders yet.</p>}
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
   );
 }

@@ -1,4 +1,107 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Manrope:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+
+:root {
+  --bg: #f7f3ee;
+  --ink: #2f2922;
+  --muted: #766c5f;
+  --line: #e4d9cb;
+  --panel: #fffdf9;
+  --panel-soft: #f6efe6;
+  --accent: #ca6e4f;
+  --accent-hover: #b75c40;
+}
+
+@layer base {
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    font-family: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(1200px 500px at 100% -5%, rgba(202, 110, 79, 0.15), transparent 65%),
+      radial-gradient(700px 400px at -8% 10%, rgba(117, 96, 70, 0.12), transparent 60%);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  .app-shell {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .view-shell {
+    @apply mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 md:py-10 lg:px-8;
+  }
+
+  .surface {
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(250, 244, 236, 0.82));
+    box-shadow:
+      0 10px 25px rgba(53, 43, 32, 0.07),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    @apply rounded-2xl;
+  }
+
+  .surface-soft {
+    border: 1px solid rgba(228, 217, 203, 0.9);
+    background: rgba(255, 252, 246, 0.92);
+    @apply rounded-xl;
+  }
+
+  .title-display {
+    font-family: "Fraunces", Georgia, serif;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    @apply text-3xl font-semibold md:text-4xl;
+  }
+
+  .muted {
+    color: var(--muted);
+  }
+
+  .input-field {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    @apply w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition focus:border-[#c8baa8] focus:ring-2 focus:ring-[#d9cfc3];
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition hover:translate-y-[-1px];
+  }
+
+  .btn-primary:hover {
+    background: var(--accent-hover);
+  }
+
+  .btn-soft {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition;
+  }
+
+  .btn-soft:hover {
+    background: var(--panel-soft);
+  }
+
+  .btn-danger {
+    border: 1px solid #e7c3b8;
+    background: #fbe9e3;
+    color: #7e3f2e;
+    @apply inline-flex items-center justify-center rounded-xl px-3.5 py-2 text-sm font-semibold transition hover:bg-[#f6ddd4];
+  }
+
+  .status-pill {
+    border: 1px solid var(--line);
+    background: rgba(255, 251, 245, 0.95);
+    @apply inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize;
+  }
+}

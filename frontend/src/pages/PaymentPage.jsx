@@ -1,121 +1,130 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { useSelector } from "react-redux";
 
 export default function PaymentPage() {
   const { orderId } = useParams();
+  const navigate = useNavigate();
   const { token } = useSelector((state) => state.auth);
 
   const [order, setOrder] = useState(null);
-  const [showPopup, setShowPopup] = useState(false);
   const [method, setMethod] = useState("card");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // Fetch order details
   useEffect(() => {
     async function fetchOrder() {
-      const res = await axios.get(
-        `http://localhost:3000/api/orders/${orderId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-
-      setOrder(res.data);
+      setLoading(true);
+      setError("");
+      try {
+        const res = await axios.get(`http://localhost:3000/api/orders/${orderId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setOrder(res.data);
+      } catch (err) {
+        console.error("Failed to fetch order:", err);
+        setError("Unable to load this order.");
+      } finally {
+        setLoading(false);
+      }
     }
 
     fetchOrder();
   }, [orderId, token]);
 
   async function handlePayment() {
+    if (!order) return;
+
     try {
       await axios.post(
         "http://localhost:3000/api/payments/charge",
         {
           orderId,
           amount: order.totalPrice,
-          method
+          method,
         },
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
 
-      alert("Payment successful!");
-      window.location.href = `/track/${orderId}`;
-
+      navigate(`/track/${orderId}`);
     } catch (err) {
-      console.error(err);
-      alert("Payment failed");
+      console.error("Payment failed:", err);
+      alert("Payment failed. Please try again.");
     }
   }
 
-  if (!order) return <p>Loading...</p>;
-
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
+    <section className="view-shell space-y-6">
+      <header className="surface p-6 md:p-7">
+        <p className="text-xs uppercase tracking-[0.2em] text-[#8a7c6d]">Checkout</p>
+        <h1 className="title-display mt-2">Payment</h1>
+        <p className="muted mt-2 text-sm">Review your order and complete payment securely.</p>
+      </header>
 
-      <h2 className="text-2xl font-bold mb-4">Payment</h2>
-
-      {/* ORDER SUMMARY */}
-      <div className="bg-white p-4 rounded-xl shadow-md mb-4">
-        <h3 className="font-bold">Order Summary</h3>
-
-        {order.items.map((item, i) => (
-          <div key={i}>
-            {item.name} x {item.quantity}
-          </div>
-        ))}
-
-        <p className="mt-3 text-lg font-semibold">
-          Total: ${order.totalPrice}
+      {error && (
+        <p className="rounded-xl border border-[#e8c9bc] bg-[#f9e7df] px-4 py-3 text-sm text-[#8a4330]">
+          {error}
         </p>
-      </div>
-
-      {/* PAY BUTTON */}
-      <button
-        onClick={() => setShowPopup(true)}
-        className="bg-green-500 text-white px-4 py-2 rounded-md"
-      >
-        Pay ${order.totalPrice}
-      </button>
-
-      {/* PAYMENT POPUP */}
-      {showPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-
-          <div className="bg-white p-6 rounded-xl w-80">
-
-            <h3 className="font-bold mb-3">Select Payment Method</h3>
-
-            <select
-              className="border p-2 w-full mb-3"
-              value={method}
-              onChange={(e) => setMethod(e.target.value)}
-            >
-              <option value="card">Credit / Debit Card</option>
-              <option value="upi">UPI</option>
-              <option value="netbanking">Net Banking</option>
-            </select>
-
-            <button
-              onClick={handlePayment}
-              className="bg-blue-500 text-white px-3 py-2 rounded w-full"
-            >
-              Confirm Payment
-            </button>
-
-            <button
-              onClick={() => setShowPopup(false)}
-              className="mt-2 text-red-500"
-            >
-              Cancel
-            </button>
-
-          </div>
-        </div>
       )}
 
-    </div>
+      {loading ? (
+        <div className="surface h-64 animate-pulse" />
+      ) : !order ? (
+        <div className="surface p-6">
+          <p className="muted">Order not found.</p>
+        </div>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="surface p-5 md:p-6">
+            <h2 className="text-xl font-semibold">Order Summary</h2>
+            <div className="mt-4 space-y-3">
+              {order.items.map((item, i) => (
+                <div key={i} className="surface-soft flex items-center justify-between p-3">
+                  <p className="text-sm font-medium text-[#352f28]">
+                    {item.name} x {item.quantity}
+                  </p>
+                  <p className="text-sm font-semibold">
+                    ${(Number(item.price) * Number(item.quantity)).toFixed(2)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <aside className="surface h-fit p-5 md:p-6">
+            <h2 className="text-xl font-semibold">Pay</h2>
+            <p className="muted mt-1 text-sm">Choose payment method and confirm.</p>
+
+            <div className="mt-4">
+              <label className="mb-1.5 block text-sm font-medium text-[#554a3f]">Method</label>
+              <select
+                className="input-field"
+                value={method}
+                onChange={(e) => setMethod(e.target.value)}
+              >
+                <option value="card">Credit / Debit Card</option>
+                <option value="upi">UPI</option>
+                <option value="netbanking">Net Banking</option>
+              </select>
+            </div>
+
+            <div className="mt-5 border-t border-[#eadfce] pt-4">
+              <p className="flex items-center justify-between text-sm">
+                <span className="muted">Total</span>
+                <span className="text-lg font-semibold text-[#2e2721]">
+                  ${Number(order.totalPrice).toFixed(2)}
+                </span>
+              </p>
+              <button onClick={handlePayment} className="btn-primary mt-4 w-full">
+                Confirm Payment
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
+    </section>
   );
 }

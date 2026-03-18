@@ -7,7 +7,7 @@ let user = null;
 if (token) {
   try {
     user = jwtDecode(token);
-  } catch (err) {
+  } catch {
     console.error("Invalid token");
   }
 }
