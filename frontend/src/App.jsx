@@ -8,6 +8,7 @@ import PaymentPage from "./pages/PaymentPage.jsx";
 import AdminDashboard from "./pages/AdminDashboard.jsx";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import Navbar from "./components/Navbar"; 
+import OrderHistory from "./pages/OrderHistory.jsx";
 
 
 
@@ -31,6 +32,7 @@ export default function App() {
     </ProtectedAdminRoute>
   }
 />
+        <Route path="/history" element={<OrderHistory />} />
       </Routes>
     </BrowserRouter>
   );

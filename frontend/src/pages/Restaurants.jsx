@@ -1,66 +1,66 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { useSelector } from "react-redux";
+import RestaurantCard from "../components/RestaurantCard";
 
 export default function Restaurants() {
   const [restaurants, setRestaurants] = useState([]);
-  const { token, isAuthenticated } = useSelector((state) => state.auth);
-  console.log("Current Bearer Token from Redux:", token);
+  const [search, setSearch] = useState("");
+  const [filtered, setFiltered] = useState([]);
 
-  // Redirect if NOT logged in
-  useEffect(() => {
-    if (!isAuthenticated) {
-      window.location.href = "/login";
-    }
-  }, [isAuthenticated]);
-
-  // Fetch restaurants after login
+  // FETCH RESTAURANTS FROM BACKEND
   useEffect(() => {
     async function fetchRestaurants() {
       try {
         const res = await axios.get(
-          "http://localhost:3000/api/restaurants",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+          "http://localhost:3000/api/restaurants"
         );
+
         setRestaurants(res.data);
+        setFiltered(res.data);
+
       } catch (err) {
-        console.error("Error fetching restaurants", err);
+        console.error("Error fetching restaurants:", err);
       }
     }
 
-    if (token) fetchRestaurants();
-  }, [token]);
+    fetchRestaurants();
+  }, []);
+
+  // FILTER BASED ON SEARCH
+  useEffect(() => {
+    const result = restaurants.filter((rest) =>
+      rest.name.toLowerCase().includes(search.toLowerCase())
+    );
+
+    setFiltered(result);
+  }, [search, restaurants]);
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>Restaurants</h2>
+    <div className="p-6 bg-gray-100 min-h-screen">
 
-      {restaurants.length === 0 ? (
-        <p>No restaurants found</p>
-      ) : (
-        restaurants.map((rest) => (
-          <div
-            key={rest._id}
-            style={{
-              border: "1px solid gray",
-              padding: "10px",
-              margin: "10px 0",
-              borderRadius: "8px",
-            }}
-          >
-            <h3>{rest.name}</h3>
-            <p>{rest.address}</p>
-            <p>Cuisine: {rest.cuisine}</p>
-            <button onClick={() => window.location.href = `/order/${rest._id}`}>
-    Order Now
-  </button>
-          </div>
-        ))
-      )}
+      {/* TITLE */}
+      <h2 className="text-6xl text-red-500 font-bold ">Restaurants</h2>
+
+      {/* SEARCH BAR */}
+      <input
+        type="text"
+        placeholder="Search restaurants..."
+        className="border p-2 mb-4 w-full rounded-md"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+
+      {/* GRID OF RESTAURANTS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {filtered.length === 0 ? (
+          <p>No restaurants found</p>
+        ) : (
+          filtered.map((rest) => (
+            <RestaurantCard key={rest._id} rest={rest} />
+          ))
+        )}
+      </div>
+
     </div>
   );
 }

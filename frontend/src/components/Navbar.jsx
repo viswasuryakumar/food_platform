@@ -25,6 +25,7 @@ export default function Navbar() {
         {isAuthenticated && (
           <Link to="/restaurants">Restaurants</Link>
         )}
+        <Link to="/history">Orders</Link>
 
         {user?.role === "restaurant_admin" && (
           <Link to="/admin">Admin</Link>
@@ -47,7 +48,7 @@ export default function Navbar() {
                 <div className="px-3 py-2 text-sm text-gray-600">
                   Role: {user?.role}
                 </div>
-
+              
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-3 py-2 hover:bg-gray-100"
@@ -63,6 +64,7 @@ export default function Navbar() {
           <>
             <Link to="/login">Login</Link>
             <Link to="/register">Register</Link>
+            
           </>
         )}
 
