@@ -1,23 +1,49 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 import { useSelector } from "react-redux";
 
 export default function OrderPage() {
   const { restaurantId } = useParams();
-  const [items, setItems] = useState([]);
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [qty, setQty] = useState(1);
   const { token } = useSelector((state) => state.auth);
 
-  function addItem() {
-    setItems([...items, { name, price: parseFloat(price), quantity: qty }]);
-    setName("");
-    setPrice("");
-    setQty(1);
+  const [menu, setMenu] = useState([]);
+  const [items, setItems] = useState([]);
+
+  // Fetch menu from backend
+  useEffect(() => {
+    async function fetchMenu() {
+      try {
+        const res = await axios.get(
+          `http://localhost:3000/api/restaurants/${restaurantId}`
+        );
+        setMenu(res.data.menu);
+      } catch (err) {
+        console.error("Error fetching menu", err);
+      }
+    }
+
+    fetchMenu();
+  }, [restaurantId]);
+
+  // Add item to order
+  function addItem(item) {
+    const existing = items.find((i) => i.name === item.name);
+
+    if (existing) {
+      setItems(
+        items.map((i) =>
+          i.name === item.name
+            ? { ...i, quantity: i.quantity + 1 }
+            : i
+        )
+      );
+    } else {
+      setItems([...items, { ...item, quantity: 1 }]);
+    }
   }
 
+  // Place order
   async function placeOrder() {
     try {
       const res = await axios.post(
@@ -35,53 +61,57 @@ export default function OrderPage() {
 
       alert("Order placed successfully!");
 
-      // go to payment page instead of tracking
       window.location.href = `/payment/${res.data.order._id}`;
     } catch (err) {
-      console.error("Order error", err);
+      console.error("Order failed", err);
       alert("Order failed");
     }
   }
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>Create Order</h2>
-      <p>Restaurant ID: {restaurantId}</p>
+    <div className="p-6 bg-gray-100 min-h-screen">
+      <h2 className="text-2xl font-bold mb-4">Menu</h2>
 
-      <h3>Add Item</h3>
-      <input
-        placeholder="Item name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-      />
-      <br /><br />
+      {/* MENU LIST */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {menu.map((item, index) => (
+          <div
+            key={index}
+            className="bg-white p-4 rounded-xl shadow-md"
+          >
+            <h3 className="text-lg font-semibold">{item.name}</h3>
+            <p>${item.price}</p>
 
-      <input
-        placeholder="Price"
-        value={price}
-        onChange={(e) => setPrice(e.target.value)}
-      />
-      <br /><br />
+            <button
+              onClick={() => addItem(item)}
+              className="mt-2 bg-blue-500 text-white px-3 py-1 rounded-md"
+            >
+              Add
+            </button>
+          </div>
+        ))}
+      </div>
 
-      <input
-        type="number"
-        placeholder="Quantity"
-        value={qty}
-        onChange={(e) => setQty(Number(e.target.value))}
-      />
-      <br /><br />
+      {/* ORDER SUMMARY */}
+      <h3 className="mt-6 text-xl font-bold">Your Order</h3>
 
-      <button onClick={addItem}>Add Item</button>
+      {items.length === 0 ? (
+        <p>No items added</p>
+      ) : (
+        items.map((item, index) => (
+          <div key={index}>
+            {item.name} - {item.quantity}
+          </div>
+        ))
+      )}
 
-      <h3>Items Added:</h3>
-      {items.map((it, index) => (
-        <div key={index}>
-          {it.name} - ${it.price} x {it.quantity}
-        </div>
-      ))}
-
-      <br />
-      <button onClick={placeOrder}>Place Order</button>
+      {/* PLACE ORDER BUTTON */}
+      <button
+        onClick={placeOrder}
+        className="mt-4 bg-green-500 text-white px-4 py-2 rounded-md"
+      >
+        Place Order
+      </button>
     </div>
   );
 }
