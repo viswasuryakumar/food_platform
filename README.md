@@ -125,7 +125,7 @@ Frontend: http://localhost:5173
 
 API Gateway: http://localhost:3000
 
-## 🤖 9. AI Configuration (Optional)
+## 🤖 9. AI Configuration
 
 Update the following file:
 
