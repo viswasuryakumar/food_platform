@@ -41,7 +41,7 @@ export default function Login() {
           <div className="mt-8 space-y-3 text-sm">
             <div className="surface-soft p-3">
               <p className="font-semibold text-[#4c4338]">Demo User</p>
-              <p className="muted">demo.user@campusfood.dev / demo12345</p>
+              <p className="muted">viswa123@gmail.com / viswa123456</p>
             </div>
             <div className="surface-soft p-3">
               <p className="font-semibold text-[#4c4338]">Demo Admin</p>

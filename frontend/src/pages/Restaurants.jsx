@@ -255,9 +255,9 @@ export default function Restaurants() {
     } catch (err) {
       console.error("Smart Order AI request failed:", err);
       if (err?.response?.data?.code === "OPENAI_NOT_CONFIGURED") {
-        applyLocalDraft(prompt, "Smart Order AI is not configured yet. Using local parser. ");
+        applyLocalDraft(prompt, "Smart Order AI:  ");
       } else {
-        applyLocalDraft(prompt, "Smart Order AI is unavailable right now. Using local parser. ");
+        applyLocalDraft(prompt, "Smart Order AI: ");
       }
     } finally {
       setAssistantPrompt("");
