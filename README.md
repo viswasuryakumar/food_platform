@@ -29,6 +29,17 @@ npm run dev
 
 Frontend runs on `http://localhost:5173` and API Gateway on `http://localhost:3000`.
 
+4. (Optional) Enable Smart Order AI in the restaurant search bar:
+
+Edit `api-gateway/.env` and set:
+
+```bash
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-4o-mini
+```
+
+Then restart the gateway/dev server.
+
 ## One Command (Setup + Run)
 
 ```bash
