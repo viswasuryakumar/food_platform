@@ -2,8 +2,6 @@
 
 > A scalable, microservices-based full-stack application for efficient digital food ordering, real-time tracking, and intelligent recommendations.
 
----
-
 ## 📌 1. Problem Statement
 
 In modern environments such as workplaces, educational institutions, and public food courts, users frequently encounter inefficiencies in food ordering systems. These challenges include:
@@ -14,8 +12,6 @@ In modern environments such as workplaces, educational institutions, and public 
 - Inefficient communication between users and service providers
 
 These issues result in poor user experience, time inefficiencies, and reduced operational effectiveness.
-
----
 
 ## 💡 2. Proposed Solution
 
