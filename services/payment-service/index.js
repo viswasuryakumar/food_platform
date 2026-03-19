@@ -5,7 +5,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
 
-const Payment = require("./models/Payment");
+const Payment = require("./models/payment");
 
 function toServiceUrl(host) {
   if (!host) return undefined;

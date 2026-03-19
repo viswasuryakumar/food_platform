@@ -1,0 +1,77 @@
+services:
+  api-gateway:
+    image: ${DOCKER_USERNAME}/food-platform-api-gateway:latest
+    build: ./api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      JWT_SECRET: ${JWT_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      USER_SERVICE_URL: http://user-service:3001
+      RESTAURANT_SERVICE_URL: http://restaurant-service:3002
+      ORDER_SERVICE_URL: http://order-service:3003
+      PAYMENT_SERVICE_URL: http://payment-service:3004
+      NOTIFICATION_SERVICE_URL: http://notification-service:3005
+    depends_on:
+      - user-service
+      - restaurant-service
+      - order-service
+      - payment-service
+      - notification-service
+    restart: unless-stopped
+
+  user-service:
+    image: ${DOCKER_USERNAME}/food-platform-user-service:latest
+    build: ./services/user-service
+    environment:
+      PORT: "3001"
+      MONGO_URI: ${MONGO_URI_USER}
+      JWT_SECRET: ${JWT_SECRET}
+    restart: unless-stopped
+
+  restaurant-service:
+    image: ${DOCKER_USERNAME}/food-platform-restaurant-service:latest
+    build: ./services/restaurant-service
+    environment:
+      PORT: "3002"
+      MONGO_URI: ${MONGO_URI_RESTAURANT}
+    restart: unless-stopped
+
+  order-service:
+    image: ${DOCKER_USERNAME}/food-platform-order-service:latest
+    build: ./services/order-service
+    environment:
+      PORT: "3003"
+      MONGO_URI: ${MONGO_URI_ORDER}
+    restart: unless-stopped
+
+  payment-service:
+    image: ${DOCKER_USERNAME}/food-platform-payment-service:latest
+    build: ./services/payment-service
+    environment:
+      PORT: "3004"
+      MONGO_URI: ${MONGO_URI_PAYMENT}
+      API_GATEWAY_URL: http://api-gateway:3000
+    restart: unless-stopped
+
+  notification-service:
+    image: ${DOCKER_USERNAME}/food-platform-notification-service:latest
+    build: ./services/notification-service
+    environment:
+      PORT: "3005"
+    restart: unless-stopped
+
+  frontend:
+    image: ${DOCKER_USERNAME}/food-platform-frontend:latest
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+    ports:
+      - "80:80"
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
