@@ -2,13 +2,18 @@
 
 ## Quick Start
 
-1. Start MongoDB (Docker):
+1. Start MongoDB (local `mongod`, no Docker):
 
 ```bash
 npm run db:start
 ```
 
-If this says Docker daemon is not running, start Docker Desktop first and rerun.
+If `mongod` is missing, install MongoDB server first:
+
+```bash
+brew tap mongodb/brew
+brew install mongodb-community
+```
 
 2. Install dependencies and generate missing `.env` files:
 
@@ -30,7 +35,7 @@ Frontend runs on `http://localhost:5173` and API Gateway on `http://localhost:30
 npm run setup:run
 ```
 
-This runs setup, starts MongoDB, and starts all services.
+This runs setup and starts all services.
 
 ## Mock Data
 
@@ -55,11 +60,11 @@ Demo login credentials:
 
 - `npm run setup`: Install all dependencies + create missing `.env` files.
 - `npm run setup:env`: Create only `.env` files (skip dependency install).
-- `npm run db:start`: Start local MongoDB in Docker container `campus-food-mongo`.
-- `npm run db:stop`: Stop the MongoDB Docker container.
-- `npm run db:status`: Check MongoDB container status.
+- `npm run db:start`: Start local MongoDB using `mongod`.
+- `npm run db:stop`: Stop local MongoDB.
+- `npm run db:status`: Check MongoDB status.
 - `npm run seed`: Add/update demo data.
 - `npm run seed:reset`: Clear restaurant/order/payment data and reseed.
 - `npm run dev`: Run all services and frontend in parallel (dev mode).
-- `npm run dev:with-db`: Start MongoDB then run all services.
-- `npm run setup:demo`: Setup + start DB + seed data + run all services.
+- `npm run dev:with-db`: Start MongoDB and then run all services.
+- `npm run setup:demo`: Setup + seed data + run all services.

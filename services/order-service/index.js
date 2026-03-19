@@ -11,6 +11,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 mongoose.set("bufferCommands", false);
+const DB_RETRY_DELAY_MS = Number(process.env.DB_RETRY_DELAY_MS || 2000);
 
 // GET ALL ORDERS (ADMIN)
 app.get("/orders", async (req, res) => {
@@ -90,19 +91,24 @@ app.put("/orders/:id/status", async (req, res) => {
 });
 
 async function startServer() {
-  try {
-    await mongoose.connect(process.env.MONGO_URI, {
-      serverSelectionTimeoutMS: 3000,
-    });
-    console.log("Order DB Connected");
-
-    app.listen(process.env.PORT, () =>
-      console.log(`Order Service running on port ${process.env.PORT}`)
-    );
-  } catch (err) {
-    console.error("Fatal DB Error:", err.message);
-    process.exit(1);
+  while (true) {
+    try {
+      await mongoose.connect(process.env.MONGO_URI, {
+        serverSelectionTimeoutMS: 3000,
+      });
+      console.log("Order DB Connected");
+      break;
+    } catch (err) {
+      console.error(
+        `Order DB connection failed (${err.message}). Retrying in ${DB_RETRY_DELAY_MS}ms...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, DB_RETRY_DELAY_MS));
+    }
   }
+
+  app.listen(process.env.PORT, () =>
+    console.log(`Order Service running on port ${process.env.PORT}`)
+  );
 }
 
 startServer();
