@@ -171,6 +171,8 @@ async function callOpenAiSmartOrder(prompt, catalog) {
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${OPENAI_API_KEY}`,
+      "HTTP-Referer": "https://food-platform.app",
+      "X-Title": "Food Platform",
     },
     body: JSON.stringify({
       model: OPENAI_MODEL,
