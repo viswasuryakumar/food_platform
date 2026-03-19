@@ -56,15 +56,11 @@ Demo login credentials:
 - `demo.user@campusfood.dev` / `demo12345`
 - `admin@campusfood.dev` / `demo12345`
 
-## Useful Scripts
+## Current Commands
 
 - `npm run setup`: Install all dependencies + create missing `.env` files.
-- `npm run setup:env`: Create only `.env` files (skip dependency install).
 - `npm run db:start`: Start local MongoDB using `mongod`.
-- `npm run db:stop`: Stop local MongoDB.
-- `npm run db:status`: Check MongoDB status.
+- `npm run dev`: Run all services and frontend in parallel (dev mode).
+- `npm run setup:run`: Run setup and then start all services.
 - `npm run seed`: Add/update demo data.
 - `npm run seed:reset`: Clear restaurant/order/payment data and reseed.
-- `npm run dev`: Run all services and frontend in parallel (dev mode).
-- `npm run dev:with-db`: Start MongoDB and then run all services.
-- `npm run setup:demo`: Setup + seed data + run all services.

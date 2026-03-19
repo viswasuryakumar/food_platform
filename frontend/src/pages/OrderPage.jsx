@@ -1,15 +1,26 @@
 import { useMemo, useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useSelector } from "react-redux";
 import axios from "axios";
 
+function normalizeName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export default function OrderPage() {
   const { restaurantId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const { token } = useSelector((state) => state.auth);
 
   const [restaurant, setRestaurant] = useState(null);
   const [items, setItems] = useState([]);
+  const [draftNotice, setDraftNotice] = useState("");
+  const [draftApplied, setDraftApplied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -32,6 +43,59 @@ export default function OrderPage() {
   }, [restaurantId]);
 
   const menu = restaurant?.menu || [];
+  const draftItems = useMemo(
+    () =>
+      Array.isArray(location.state?.draftItems)
+        ? location.state.draftItems.filter((item) => item?.name)
+        : [],
+    [location.state]
+  );
+
+  useEffect(() => {
+    setDraftApplied(false);
+    setDraftNotice("");
+  }, [restaurantId]);
+
+  useEffect(() => {
+    if (!restaurant || draftApplied) return;
+    if (!draftItems.length) {
+      setDraftApplied(true);
+      return;
+    }
+
+    const menuByName = new Map(
+      (restaurant.menu || []).map((item) => [normalizeName(item.name), item])
+    );
+
+    const hydrated = [];
+    const missing = [];
+
+    for (const draftItem of draftItems) {
+      const matchedItem = menuByName.get(normalizeName(draftItem.name));
+      if (!matchedItem) {
+        missing.push(draftItem.name);
+        continue;
+      }
+
+      hydrated.push({
+        ...matchedItem,
+        quantity: Math.max(1, Number(draftItem.quantity) || 1),
+      });
+    }
+
+    if (hydrated.length > 0) {
+      setItems(hydrated);
+      setDraftNotice(
+        missing.length
+          ? `Assistant draft loaded. Skipped unavailable items: ${missing.join(", ")}.`
+          : "Assistant draft loaded into your cart."
+      );
+    } else {
+      setDraftNotice("Couldn't map the assistant draft to this menu. Please add items manually.");
+    }
+
+    setDraftApplied(true);
+  }, [restaurant, draftItems, draftApplied]);
 
   function addItem(item) {
     const existing = items.find((i) => i.name === item.name);
@@ -103,6 +167,12 @@ export default function OrderPage() {
       {error && (
         <p className="rounded-xl border border-[#e8c9bc] bg-[#f9e7df] px-4 py-3 text-sm text-[#8a4330]">
           {error}
+        </p>
+      )}
+
+      {draftNotice && (
+        <p className="rounded-xl border border-[#e4d6c6] bg-[#f8efe5] px-4 py-3 text-sm text-[#5f5143]">
+          {draftNotice}
         </p>
       )}
 

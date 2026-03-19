@@ -32,6 +32,8 @@ const envTemplates = [
       "ORDER_SERVICE_URL=http://localhost:3003",
       "PAYMENT_SERVICE_URL=http://localhost:3004",
       "NOTIFICATION_SERVICE_URL=http://localhost:3005",
+      "OPENAI_API_KEY=",
+      "OPENAI_MODEL=gpt-4o-mini",
       "",
     ].join("\n"),
   },
