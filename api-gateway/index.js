@@ -7,6 +7,14 @@ const morgan = require("morgan");
 const { createProxyMiddleware } = require("http-proxy-middleware");
 
 const app = express();
+
+// Render's `fromService.property: host` gives a bare hostname with no protocol.
+// Prepend https:// when needed so proxy targets are valid URLs.
+function toServiceUrl(host) {
+  if (!host) return undefined;
+  return host.startsWith("http") ? host : `https://${host}`;
+}
+
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
@@ -328,7 +336,7 @@ app.post("/api/ai/smart-order", async (req, res) => {
 app.use(
   "/api/auth",
   createProxyMiddleware({
-    target: process.env.USER_SERVICE_URL, // http://localhost:3001
+    target: toServiceUrl(process.env.USER_SERVICE_URL) || "http://localhost:3001",
     changeOrigin: true,
     pathRewrite: (path, req) => `/auth${path}`, // /api/auth/register -> /auth/register
     on: {
@@ -392,7 +400,7 @@ app.use("/api/restaurants", (req, res, next) => {
 app.use(
   "/api/restaurants",
   createProxyMiddleware({
-    target: process.env.RESTAURANT_SERVICE_URL,
+    target: toServiceUrl(process.env.RESTAURANT_SERVICE_URL) || "http://localhost:3002",
     changeOrigin: true,
     pathRewrite: (path, req) =>  `/restaurants${path}`,
     on: {
@@ -423,7 +431,7 @@ app.use(
 app.use(
   "/api/orders",
   createProxyMiddleware({
-    target: process.env.ORDER_SERVICE_URL,
+    target: toServiceUrl(process.env.ORDER_SERVICE_URL) || "http://localhost:3003",
     changeOrigin: true,
     pathRewrite: (path, req) => `/orders${path}`,
     on: {
@@ -454,7 +462,7 @@ app.use(
 app.use(
   "/api/payments",
   createProxyMiddleware({
-    target: process.env.PAYMENT_SERVICE_URL,
+    target: toServiceUrl(process.env.PAYMENT_SERVICE_URL) || "http://localhost:3004",
     changeOrigin: true,
     pathRewrite: (path, req) => `/payments${path}`,
     on: { 
@@ -485,7 +493,7 @@ app.use(
 app.use(
   "/api/notifications",
   createProxyMiddleware({
-    target: process.env.NOTIFICATION_SERVICE_URL,
+    target: toServiceUrl(process.env.NOTIFICATION_SERVICE_URL) || "http://localhost:3005",
     ws: true,
     changeOrigin: true,
     pathRewrite: (path, req) => `/notifications${path}`,

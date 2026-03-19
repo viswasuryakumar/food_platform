@@ -7,6 +7,11 @@ const { v4: uuidv4 } = require("uuid");
 
 const Payment = require("./models/Payment");
 
+function toServiceUrl(host) {
+  if (!host) return undefined;
+  return host.startsWith("http") ? host : `https://${host}`;
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -37,7 +42,7 @@ app.post("/payments/charge", async (req, res) => {
     // --- NEW: Update Order Service status ---
     try {
       await axios.put(
-        `${process.env.API_GATEWAY_URL || "http://localhost:3000"}/api/orders/${orderId}/status`,
+        `${toServiceUrl(process.env.API_GATEWAY_URL) || "http://localhost:3000"}/api/orders/${orderId}/status`,
         { status: "paid" },
         {
           headers: {

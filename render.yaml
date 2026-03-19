@@ -19,27 +19,27 @@ services:
         fromService:
           name: user-service
           type: web
-          property: url
+          property: host
       - key: RESTAURANT_SERVICE_URL
         fromService:
           name: restaurant-service
           type: web
-          property: url
+          property: host
       - key: ORDER_SERVICE_URL
         fromService:
           name: order-service
           type: web
-          property: url
+          property: host
       - key: PAYMENT_SERVICE_URL
         fromService:
           name: payment-service
           type: web
-          property: url
+          property: host
       - key: NOTIFICATION_SERVICE_URL
         fromService:
           name: notification-service
           type: web
-          property: url
+          property: host
 
   # ── User Service ──
   - type: web
@@ -90,7 +90,7 @@ services:
         fromService:
           name: api-gateway
           type: web
-          property: url
+          property: host
 
   # ── Notification Service ──
   - type: web
