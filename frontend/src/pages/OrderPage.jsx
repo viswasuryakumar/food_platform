@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useSelector } from "react-redux";
 import api from "../api/axiosInstance";
+import FoodCylinderStrip from "../components/FoodCylinderStrip";
 
 function normalizeName(value) {
   return String(value || "")
@@ -179,6 +180,7 @@ export default function OrderPage() {
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="surface p-5 md:p-6">
           <h2 className="mb-4 text-xl font-semibold">Menu Items</h2>
+          {!loading && menu.length > 0 && <FoodCylinderStrip items={menu} />}
           {loading ? (
             <div className="space-y-3">
               {[...Array(4)].map((_, i) => (

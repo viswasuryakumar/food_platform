@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import RestaurantCard from "../components/RestaurantCard";
 
 export default function Restaurants() {
@@ -198,42 +199,56 @@ export default function Restaurants() {
       </header>
 
       {assistantEnabled && (
-        <section className="surface space-y-4 p-5 md:p-6">
-          <h2 className="text-lg font-semibold">Order Assistant</h2>
-
-          {!latestAssistantMessage ? (
-            <p className="muted text-sm">
-              Ask naturally, for example: "I want 2 Veggie Roll from Sushi Lab".
-            </p>
-          ) : (
-            <div className="rounded-xl border border-[#e8dccf] bg-[#fffaf4] px-3 py-2 text-sm text-[#51463a]">
-              {latestAssistantMessage}
+        assistantLoading ? (
+          <section className="surface p-5 md:p-6">
+            <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-[#e8dccf] bg-[#fffaf4] p-4">
+              <DotLottieReact
+                src="/Cooking.lottie"
+                autoplay
+                loop
+                className="h-36 w-36 md:h-44 md:w-44"
+              />
+              <p className="muted text-sm">Smart Order is cooking your result...</p>
             </div>
-          )}
+          </section>
+        ) : (
+          <section className="surface space-y-4 p-5 md:p-6">
+            <h2 className="text-lg font-semibold">Order Assistant</h2>
 
-          {draftOrder && (
-            <div className="surface-soft space-y-3 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-[#3d3329]">
-                  Draft from {draftOrder.restaurant.name}
-                </p>
-                <p className="text-sm font-semibold text-[#8a4330]">
-                  ${draftOrder.total.toFixed(2)}
-                </p>
+            {!latestAssistantMessage ? (
+              <p className="muted text-sm">
+                Ask naturally, for example: "I want 2 Veggie Roll from Sushi Lab".
+              </p>
+            ) : (
+              <div className="rounded-xl border border-[#e8dccf] bg-[#fffaf4] px-3 py-2 text-sm text-[#51463a]">
+                {latestAssistantMessage}
               </div>
-              <ul className="space-y-1 text-sm text-[#5a4e42]">
-                {draftOrder.items.map((item, index) => (
-                  <li key={`${item.name}-${index}`}>
-                    {item.quantity} x {item.name}
-                  </li>
-                ))}
-              </ul>
-              <button onClick={openDraftOrder} className="btn-primary">
-                Review And Place
-              </button>
-            </div>
-          )}
-        </section>
+            )}
+
+            {draftOrder && (
+              <div className="surface-soft space-y-3 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-[#3d3329]">
+                    Draft from {draftOrder.restaurant.name}
+                  </p>
+                  <p className="text-sm font-semibold text-[#8a4330]">
+                    ${draftOrder.total.toFixed(2)}
+                  </p>
+                </div>
+                <ul className="space-y-1 text-sm text-[#5a4e42]">
+                  {draftOrder.items.map((item, index) => (
+                    <li key={`${item.name}-${index}`}>
+                      {item.quantity} x {item.name}
+                    </li>
+                  ))}
+                </ul>
+                <button onClick={openDraftOrder} className="btn-primary">
+                  Review And Place
+                </button>
+              </div>
+            )}
+          </section>
+        )
       )}
 
       {error && (

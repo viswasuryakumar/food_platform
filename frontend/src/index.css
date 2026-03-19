@@ -104,4 +104,64 @@
     background: rgba(255, 251, 245, 0.95);
     @apply inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize;
   }
+
+  .cylinder-scroll::-webkit-scrollbar {
+    height: 7px;
+  }
+
+  .cylinder-scroll::-webkit-scrollbar-track {
+    background: rgba(228, 217, 203, 0.42);
+    border-radius: 999px;
+  }
+
+  .cylinder-scroll::-webkit-scrollbar-thumb {
+    background: rgba(202, 110, 79, 0.45);
+    border-radius: 999px;
+  }
+
+  .route-transition-shell {
+    position: relative;
+    overflow-x: clip;
+  }
+
+  .route-scene {
+    position: relative;
+  }
+
+  .route-scene-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    background: var(--bg);
+    overflow: hidden;
+    will-change: clip-path;
+    isolation: isolate;
+  }
+
+  .route-scene-overlay-forward {
+    transform: translate3d(0, 0, 0);
+  }
+
+  .route-scene-overlay-backward {
+    transform: translate3d(0, 0, 0);
+  }
+
+  .route-edge-webgl-canvas {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--edge-percent, 50%) - 22px);
+    width: 44px;
+    height: 100%;
+    z-index: 6;
+    pointer-events: none;
+  }
+
+  .route-edge-webgl-canvas-forward {
+    transform: none;
+  }
+
+  .route-edge-webgl-canvas-backward {
+    transform: scaleX(-1);
+  }
 }
