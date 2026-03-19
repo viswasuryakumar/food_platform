@@ -6,7 +6,39 @@ on:
   workflow_dispatch:
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api-gateway: ${{ steps.filter.outputs.api-gateway }}
+      user-service: ${{ steps.filter.outputs.user-service }}
+      restaurant-service: ${{ steps.filter.outputs.restaurant-service }}
+      order-service: ${{ steps.filter.outputs.order-service }}
+      payment-service: ${{ steps.filter.outputs.payment-service }}
+      notification-service: ${{ steps.filter.outputs.notification-service }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            api-gateway:
+              - 'api-gateway/**'
+            user-service:
+              - 'services/user-service/**'
+            restaurant-service:
+              - 'services/restaurant-service/**'
+            order-service:
+              - 'services/order-service/**'
+            payment-service:
+              - 'services/payment-service/**'
+            notification-service:
+              - 'services/notification-service/**'
+            frontend:
+              - 'frontend/**'
+
   build-and-push:
+    needs: detect-changes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,63 +53,77 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push api-gateway
+        if: needs.detect-changes.outputs.api-gateway == 'true' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v6
         with:
           context: ./api-gateway
+          platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/food-platform-api-gateway:latest
           cache-from: type=gha,scope=api-gateway
           cache-to: type=gha,mode=max,scope=api-gateway
 
       - name: Build and push user-service
+        if: needs.detect-changes.outputs.user-service == 'true' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v6
         with:
           context: ./services/user-service
+          platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/food-platform-user-service:latest
           cache-from: type=gha,scope=user-service
           cache-to: type=gha,mode=max,scope=user-service
 
       - name: Build and push restaurant-service
+        if: needs.detect-changes.outputs.restaurant-service == 'true' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v6
         with:
           context: ./services/restaurant-service
+          platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/food-platform-restaurant-service:latest
           cache-from: type=gha,scope=restaurant-service
           cache-to: type=gha,mode=max,scope=restaurant-service
 
       - name: Build and push order-service
+        if: needs.detect-changes.outputs.order-service == 'true' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v6
         with:
           context: ./services/order-service
+          platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/food-platform-order-service:latest
           cache-from: type=gha,scope=order-service
           cache-to: type=gha,mode=max,scope=order-service
 
       - name: Build and push payment-service
+        if: needs.detect-changes.outputs.payment-service == 'true' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v6
         with:
           context: ./services/payment-service
+          platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/food-platform-payment-service:latest
           cache-from: type=gha,scope=payment-service
           cache-to: type=gha,mode=max,scope=payment-service
 
       - name: Build and push notification-service
+        if: needs.detect-changes.outputs.notification-service == 'true' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v6
         with:
           context: ./services/notification-service
+          platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/food-platform-notification-service:latest
           cache-from: type=gha,scope=notification-service
           cache-to: type=gha,mode=max,scope=notification-service
 
       - name: Build and push frontend
+        if: needs.detect-changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
+          platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/food-platform-frontend:latest
           build-args: VITE_API_URL=${{ secrets.VITE_API_URL }}
@@ -85,10 +131,10 @@ jobs:
           cache-to: type=gha,mode=max,scope=frontend
 
   deploy:
-    needs: build-and-push
+    needs: [detect-changes, build-and-push]
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH
+      - name: Deploy changed services via SSH
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DROPLET_HOST }}
@@ -97,6 +143,6 @@ jobs:
           script: |
             cd /app/food_platform
             git pull origin main
-            docker compose pull
-            docker compose up -d
+            docker-compose pull
+            docker-compose up -d
             docker image prune -f
