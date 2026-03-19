@@ -100,23 +100,3 @@ services:
     buildCommand: npm install
     startCommand: node index.js
 
-  # ── Frontend (Static Site) ──
-  - type: static
-    name: frontend
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    headers:
-      - path: /*
-        name: Cache-Control
-        value: public, max-age=0, must-revalidate
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      - key: VITE_API_URL
-        fromService:
-          name: api-gateway
-          type: web
-          property: url
