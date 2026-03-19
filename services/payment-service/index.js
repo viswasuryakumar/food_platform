@@ -37,7 +37,7 @@ app.post("/payments/charge", async (req, res) => {
     // --- NEW: Update Order Service status ---
     try {
       await axios.put(
-        `http://localhost:3000/api/orders/${orderId}/status`,
+        `${process.env.API_GATEWAY_URL || "http://localhost:3000"}/api/orders/${orderId}/status`,
         { status: "paid" },
         {
           headers: {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import axios from "axios";
+import api from "../api/axiosInstance";
 import { useSelector } from "react-redux";
 
 export default function PaymentPage() {
@@ -18,7 +18,7 @@ export default function PaymentPage() {
       setLoading(true);
       setError("");
       try {
-        const res = await axios.get(`http://localhost:3000/api/orders/${orderId}`, {
+        const res = await api.get(`/api/orders/${orderId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setOrder(res.data);
@@ -37,8 +37,8 @@ export default function PaymentPage() {
     if (!order) return;
 
     try {
-      await axios.post(
-        "http://localhost:3000/api/payments/charge",
+      await api.post(
+        "/api/payments/charge",
         {
           orderId,
           amount: order.totalPrice,

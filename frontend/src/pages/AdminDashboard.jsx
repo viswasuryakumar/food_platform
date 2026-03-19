@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api/axiosInstance";
 import { useSelector } from "react-redux";
 
 export default function AdminDashboard() {
@@ -16,7 +16,7 @@ export default function AdminDashboard() {
 
   async function fetchOrders() {
     try {
-      const res = await axios.get("http://localhost:3000/api/orders", {
+      const res = await api.get("/api/orders", {
         headers: { Authorization: `Bearer ${token}` },
       });
       setOrders(res.data || []);
@@ -27,7 +27,7 @@ export default function AdminDashboard() {
 
   async function fetchRestaurants() {
     try {
-      const res = await axios.get("http://localhost:3000/api/restaurants");
+      const res = await api.get("/api/restaurants");
       setRestaurants(res.data || []);
     } catch (err) {
       console.error("Fetch restaurants error:", err);
@@ -40,10 +40,10 @@ export default function AdminDashboard() {
     async function bootstrapDashboard() {
       try {
         const [ordersRes, restaurantsRes] = await Promise.all([
-          axios.get("http://localhost:3000/api/orders", {
+          api.get("/api/orders", {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get("http://localhost:3000/api/restaurants"),
+          api.get("/api/restaurants"),
         ]);
 
         if (cancelled) return;
@@ -63,8 +63,8 @@ export default function AdminDashboard() {
 
   async function updateStatus(orderId, status) {
     try {
-      await axios.put(
-        `http://localhost:3000/api/orders/${orderId}/status`,
+      await api.put(
+        `/api/orders/${orderId}/status`,
         { status },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -86,8 +86,8 @@ export default function AdminDashboard() {
 
   async function createRestaurant() {
     try {
-      await axios.post(
-        "http://localhost:3000/api/restaurants",
+      await api.post(
+        "/api/restaurants",
         {
           name,
           address,
@@ -115,8 +115,8 @@ export default function AdminDashboard() {
     if (!newName) return;
 
     try {
-      await axios.put(
-        `http://localhost:3000/api/restaurants/${id}`,
+      await api.put(
+        `/api/restaurants/${id}`,
         { name: newName },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -130,7 +130,7 @@ export default function AdminDashboard() {
 
   async function deleteRestaurant(id) {
     try {
-      await axios.delete(`http://localhost:3000/api/restaurants/${id}`, {
+      await api.delete(`/api/restaurants/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchRestaurants();

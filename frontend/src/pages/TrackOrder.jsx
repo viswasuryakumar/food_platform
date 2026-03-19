@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import axios from "axios";
+import api from "../api/axiosInstance";
 import { useSelector } from "react-redux";
 
 const orderFlow = ["pending", "preparing", "on-the-way", "delivered"];
@@ -14,7 +14,7 @@ export default function TrackOrder() {
   useEffect(() => {
     const fetchOrder = async () => {
       try {
-        const res = await axios.get(`http://localhost:3000/api/orders/${orderId}`, {
+        const res = await api.get(`/api/orders/${orderId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -32,7 +32,9 @@ export default function TrackOrder() {
   }, [orderId, token]);
 
   useEffect(() => {
-    const socket = new WebSocket("ws://localhost:3005");
+    const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+    const wsUrl = baseUrl.replace(/^http/, "ws");
+    const socket = new WebSocket(wsUrl);
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import api from "../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import RestaurantCard from "../components/RestaurantCard";
 
@@ -168,7 +168,7 @@ export default function Restaurants() {
       setLoading(true);
       setError("");
       try {
-        const res = await axios.get("http://localhost:3000/api/restaurants");
+        const res = await api.get("/api/restaurants");
         setRestaurants(res.data || []);
       } catch (err) {
         console.error("Error fetching restaurants:", err);
@@ -230,7 +230,7 @@ export default function Restaurants() {
         })),
       }));
 
-      const response = await axios.post("http://localhost:3000/api/ai/smart-order", {
+      const response = await api.post("/api/ai/smart-order", {
         prompt,
         restaurants: catalog,
       });

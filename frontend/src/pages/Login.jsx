@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../api/axiosInstance";
 import { useDispatch } from "react-redux";
 import { login } from "../redux/authSlice";
 
@@ -16,7 +16,7 @@ export default function Login() {
     setError("");
 
     try {
-      const res = await axios.post("http://localhost:3000/api/auth/login", {
+      const res = await api.post("/api/auth/login", {
         email,
         password,
       });

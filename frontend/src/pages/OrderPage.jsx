@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useSelector } from "react-redux";
-import axios from "axios";
+import api from "../api/axiosInstance";
 
 function normalizeName(value) {
   return String(value || "")
@@ -29,7 +29,7 @@ export default function OrderPage() {
       setLoading(true);
       setError("");
       try {
-        const res = await axios.get(`http://localhost:3000/api/restaurants/${restaurantId}`);
+        const res = await api.get(`/api/restaurants/${restaurantId}`);
         setRestaurant(res.data);
       } catch (err) {
         console.error("Failed to fetch menu:", err);
@@ -136,8 +136,8 @@ export default function OrderPage() {
     }
 
     try {
-      const res = await axios.post(
-        "http://localhost:3000/api/orders",
+      const res = await api.post(
+        "/api/orders",
         {
           restaurantId,
           items,

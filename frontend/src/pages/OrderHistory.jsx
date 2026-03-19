@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api/axiosInstance";
 import { useSelector } from "react-redux";
 
 export default function OrderHistory() {
@@ -13,7 +13,7 @@ export default function OrderHistory() {
       setLoading(true);
       setError("");
       try {
-        const res = await axios.get("http://localhost:3000/api/orders/history", {
+        const res = await api.get("/api/orders/history", {
           headers: { Authorization: `Bearer ${token}` },
         });
         setOrders(res.data || []);
