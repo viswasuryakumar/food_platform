@@ -111,12 +111,193 @@ function bestTextMatch(target, options, getLabel) {
   return bestScore > 0 ? best : null;
 }
 
+const QUANTITY_HINTS = {
+  a: 1,
+  an: 1,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+};
+
+const MATCH_STOP_WORDS = new Set([
+  "i",
+  "want",
+  "wanna",
+  "would",
+  "like",
+  "please",
+  "get",
+  "give",
+  "me",
+  "my",
+  "for",
+  "from",
+  "with",
+  "and",
+  "the",
+  "to",
+  "of",
+  "on",
+  "in",
+  "order",
+  "cart",
+  "add",
+  "make",
+]);
+
+function tokenizeForMatch(value) {
+  return normalizeLabel(value)
+    .split(" ")
+    .filter((token) => token && !MATCH_STOP_WORDS.has(token));
+}
+
+function scoreTextSimilarity(query, candidate) {
+  const normalizedQuery = normalizeLabel(query);
+  const normalizedCandidate = normalizeLabel(candidate);
+  if (!normalizedQuery || !normalizedCandidate) return 0;
+
+  if (normalizedQuery === normalizedCandidate) return 1;
+  if (normalizedCandidate.includes(normalizedQuery)) return 0.95;
+  if (normalizedQuery.includes(normalizedCandidate)) return 0.9;
+
+  const queryTokens = [...new Set(tokenizeForMatch(normalizedQuery))];
+  const candidateTokens = [...new Set(tokenizeForMatch(normalizedCandidate))];
+  if (!queryTokens.length || !candidateTokens.length) return 0;
+
+  const overlap = queryTokens.filter((token) => candidateTokens.includes(token)).length;
+  let score = overlap > 0 ? overlap / queryTokens.length : 0;
+
+  if (score === 0) {
+    const partialOverlap = queryTokens.some((token) => normalizedCandidate.includes(token));
+    if (partialOverlap) score = 0.25;
+  }
+
+  return Math.min(1, score);
+}
+
+function quantityHintFromPrompt(prompt, fallback = 1) {
+  const normalized = normalizeLabel(prompt);
+  if (!normalized) return fallback;
+
+  const digitMatch = normalized.match(/\b(\d+)\b/);
+  if (digitMatch?.[1]) {
+    return asPositiveInt(digitMatch[1], fallback);
+  }
+
+  for (const [word, quantity] of Object.entries(QUANTITY_HINTS)) {
+    if (new RegExp(`\\b${word}\\b`, "i").test(normalized)) {
+      return asPositiveInt(quantity, fallback);
+    }
+  }
+
+  return fallback;
+}
+
+function findBestCatalogItem(query, catalog, restaurantHint = "") {
+  const normalizedQuery = normalizeLabel(query);
+  if (!normalizedQuery) return null;
+
+  let best = null;
+  let bestScore = 0;
+
+  for (const restaurant of Array.isArray(catalog) ? catalog : []) {
+    const restaurantBoost = restaurantHint
+      ? scoreTextSimilarity(restaurantHint, restaurant.name) * 0.25
+      : 0;
+
+    for (const item of Array.isArray(restaurant.menu) ? restaurant.menu : []) {
+      const itemScore = scoreTextSimilarity(normalizedQuery, item.name);
+      const combinedScore = scoreTextSimilarity(
+        normalizedQuery,
+        `${restaurant.name} ${item.name}`
+      );
+      const score = Math.max(itemScore, combinedScore * 0.9) + restaurantBoost;
+
+      if (score > bestScore) {
+        best = { restaurant, item, score };
+        bestScore = score;
+      }
+    }
+  }
+
+  return bestScore >= 0.3 ? best : null;
+}
+
+function buildBestMatchFallbackDraft(prompt, catalog, options = {}) {
+  const restaurantHint = String(options.restaurantHint || "");
+  const rawItems = Array.isArray(options.rawItems) ? options.rawItems : [];
+  const candidates = [];
+
+  for (const rawItem of rawItems) {
+    const itemName = String(
+      rawItem?.name || rawItem?.itemName || rawItem?.item || ""
+    ).trim();
+    if (!itemName) continue;
+
+    const quantity = asPositiveInt(
+      rawItem?.quantity || rawItem?.qty || quantityHintFromPrompt(prompt, 1),
+      1
+    );
+
+    candidates.push({ query: itemName, quantity });
+    if (restaurantHint) {
+      candidates.push({ query: `${restaurantHint} ${itemName}`.trim(), quantity });
+    }
+  }
+
+  candidates.push({
+    query: prompt,
+    quantity: quantityHintFromPrompt(prompt, 1),
+  });
+
+  let best = null;
+  for (const candidate of candidates) {
+    const found = findBestCatalogItem(candidate.query, catalog, restaurantHint);
+    if (!found) continue;
+
+    if (!best || found.score > best.score) {
+      best = { ...found, quantity: candidate.quantity };
+    }
+  }
+
+  if (!best) return null;
+
+  const quantity = asPositiveInt(best.quantity, 1);
+  const matchedItem = {
+    name: String(best.item.name),
+    price: Number(best.item.price) || 0,
+    quantity,
+  };
+
+  return {
+    draft: {
+      restaurant: {
+        _id: String(best.restaurant._id),
+        name: String(best.restaurant.name),
+      },
+      items: [matchedItem],
+      total: matchedItem.price * quantity,
+      prompt,
+    },
+    assistantText: `Draft ready with best match: ${quantity} x ${matchedItem.name} from ${best.restaurant.name}.`,
+  };
+}
+
 function sanitizeCatalog(restaurants) {
   return (Array.isArray(restaurants) ? restaurants : [])
     .filter((restaurant) => restaurant && restaurant._id && restaurant.name)
     .map((restaurant) => ({
       _id: String(restaurant._id),
       name: String(restaurant.name),
+      cuisine: String(restaurant.cuisine || ""),
+      address: String(restaurant.address || ""),
       menu: (Array.isArray(restaurant.menu) ? restaurant.menu : [])
         .filter((item) => item && item.name)
         .slice(0, 80)
@@ -125,6 +306,117 @@ function sanitizeCatalog(restaurants) {
           price: Number(item.price) || 0,
         })),
     }));
+}
+
+async function fetchRestaurantServiceSearch(path) {
+  const baseUrl = toServiceUrl(process.env.RESTAURANT_SERVICE_URL) || "http://localhost:3002";
+  const response = await fetch(`${baseUrl}${path}`);
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`Restaurant search failed (${response.status}): ${body.slice(0, 120)}`);
+  }
+  return response.json();
+}
+
+function rankRestaurantResults(restaurants, query) {
+  const normalizedQuery = normalizeLabel(query);
+  const list = Array.isArray(restaurants) ? restaurants : [];
+
+  return list
+    .map((restaurant) => {
+      const score = normalizedQuery
+        ? Math.max(
+            scoreTextSimilarity(normalizedQuery, restaurant?.name),
+            scoreTextSimilarity(normalizedQuery, restaurant?.cuisine),
+            scoreTextSimilarity(normalizedQuery, restaurant?.address),
+            scoreTextSimilarity(
+              normalizedQuery,
+              `${restaurant?.name || ""} ${restaurant?.cuisine || ""}`
+            )
+          )
+        : 1;
+
+      return {
+        _id: String(restaurant?._id || ""),
+        name: String(restaurant?.name || ""),
+        cuisine: String(restaurant?.cuisine || ""),
+        address: String(restaurant?.address || ""),
+        score: Number(score.toFixed(3)),
+      };
+    })
+    .filter((restaurant) => restaurant._id && restaurant.name)
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+}
+
+function rankFoodItemResults(items, query) {
+  const normalizedQuery = normalizeLabel(query);
+  const list = Array.isArray(items) ? items : [];
+
+  return list
+    .map((item) => {
+      const score = normalizedQuery
+        ? Math.max(
+            scoreTextSimilarity(normalizedQuery, item?.name),
+            scoreTextSimilarity(
+              normalizedQuery,
+              `${item?.restaurantName || ""} ${item?.name || ""}`
+            ),
+            scoreTextSimilarity(normalizedQuery, `${item?.cuisine || ""} ${item?.name || ""}`)
+          )
+        : 1;
+
+      return {
+        name: String(item?.name || ""),
+        price: Number(item?.price) || 0,
+        restaurantId: String(item?.restaurantId || ""),
+        restaurantName: String(item?.restaurantName || ""),
+        cuisine: String(item?.cuisine || ""),
+        score: Number(score.toFixed(3)),
+      };
+    })
+    .filter((item) => item.name && item.restaurantId)
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        a.restaurantName.localeCompare(b.restaurantName) ||
+        a.name.localeCompare(b.name)
+    );
+}
+
+async function searchRestaurantsTool(query, limit) {
+  const safeQuery = String(query || "").trim();
+  const safeLimit = asPositiveInt(limit, 10);
+  const payload = await fetchRestaurantServiceSearch("/restaurants/search?limit=5000");
+  const allRestaurants = Array.isArray(payload?.restaurants) ? payload.restaurants : [];
+  const ranked = rankRestaurantResults(allRestaurants, safeQuery).slice(0, safeLimit);
+
+  return {
+    fetchedCount: allRestaurants.length,
+    results: ranked,
+  };
+}
+
+async function searchFoodItemsTool(query, limit) {
+  const safeQuery = String(query || "").trim();
+  const safeLimit = asPositiveInt(limit, 20);
+  const payload = await fetchRestaurantServiceSearch("/restaurants/items/search?limit=5000");
+  const allItems = Array.isArray(payload?.items) ? payload.items : [];
+  const ranked = rankFoodItemResults(allItems, safeQuery).slice(0, safeLimit);
+
+  return {
+    fetchedCount: allItems.length,
+    results: ranked,
+  };
+}
+
+function parseToolArgs(rawArguments) {
+  if (!rawArguments) return {};
+  try {
+    const parsed = JSON.parse(rawArguments);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (_) {
+    return {};
+  }
 }
 
 function extractJsonCandidate(raw) {
@@ -156,133 +448,272 @@ function extractJsonCandidate(raw) {
 
 async function callOpenAiSmartOrder(prompt, catalog) {
   const systemPrompt = [
-    "You convert food-order chat requests into structured JSON.",
-    "Use only the provided restaurant catalog and menu items.",
-    "If request is unclear or missing a mappable restaurant/menu item, return status='clarify'.",
-    "Output strict JSON only with keys:",
-    "status ('draft' or 'clarify'), restaurantName, items, clarification.",
-    "For draft: restaurantName must exactly match one catalog restaurant name.",
-    "For draft: each item name must exactly match one menu item name from that restaurant.",
-    "Quantity must be an integer 1..20.",
+    "You convert food-order chat requests into structured draft orders.",
+    "You have two tools: search_restaurants and search_food_items.",
+    "You must call both tools once before producing the final answer.",
+    "Each tool returns full data first, then ranked similarity; use those results to choose the best matching restaurant and menu items.",
+    "When prompt is vague (example: 'chinese noodles'), still return best match as status='draft' if a reasonable item exists.",
+    "Only return status='clarify' when there is no reasonable match.",
+    "Return strict JSON with keys: status ('draft' or 'clarify'), restaurantName, items, clarification.",
+    "For draft: restaurantName should match a catalog restaurant name.",
+    "For draft: each item should map to a menu item from that restaurant and quantity must be integer 1..20.",
   ].join(" ");
 
-  const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
+  const tools = [
+    {
+      type: "function",
+      function: {
+        name: "search_restaurants",
+        description: "Search restaurants by user intent.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string" },
+            limit: { type: "integer", minimum: 1, maximum: 20 },
+          },
+          required: ["query"],
+        },
+      },
     },
-    body: JSON.stringify({
+    {
+      type: "function",
+      function: {
+        name: "search_food_items",
+        description: "Search food/menu items across all restaurants by user intent.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string" },
+            limit: { type: "integer", minimum: 1, maximum: 30 },
+          },
+          required: ["query"],
+        },
+      },
+    },
+  ];
+
+  const messages = [
+    { role: "system", content: systemPrompt },
+    {
+      role: "user",
+      content: JSON.stringify({ prompt, restaurants: catalog }),
+    },
+  ];
+  const toolTrace = [];
+
+  async function requestCompletion(toolChoice, responseFormat) {
+    const body = {
       model: OPENAI_MODEL,
       temperature: 0,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: JSON.stringify({ prompt, restaurants: catalog }),
-        },
-      ],
-    }),
-  });
+      tools,
+      tool_choice: toolChoice,
+      messages,
+    };
 
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => "");
-    throw new Error(`OpenAI request failed (${response.status}): ${errorBody.slice(0, 200)}`);
+    if (responseFormat) {
+      body.response_format = responseFormat;
+    }
+
+    const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => "");
+      throw new Error(`OpenAI request failed (${response.status}): ${errorBody.slice(0, 200)}`);
+    }
+
+    const payload = await response.json();
+    const message = payload?.choices?.[0]?.message;
+    if (!message) {
+      throw new Error("OpenAI response was missing a message.");
+    }
+    return message;
   }
 
-  const payload = await response.json();
-  const content = payload?.choices?.[0]?.message?.content || "";
-  const parsed = extractJsonCandidate(content);
+  const requiredTools = ["search_restaurants", "search_food_items"];
+  for (const toolName of requiredTools) {
+    const assistantMessage = await requestCompletion({
+      type: "function",
+      function: { name: toolName },
+    });
+
+    const fallbackToolCall = {
+      id: `local_${toolName}_${Date.now()}`,
+      type: "function",
+      function: {
+        name: toolName,
+        arguments: JSON.stringify({ query: prompt }),
+      },
+    };
+
+    const selectedToolCall =
+      assistantMessage?.tool_calls?.find((call) => call?.function?.name === toolName) ||
+      assistantMessage?.tool_calls?.[0] ||
+      fallbackToolCall;
+
+    const args = parseToolArgs(selectedToolCall?.function?.arguments);
+    const query = String(args?.query || prompt).trim();
+    const limit = asPositiveInt(args?.limit, toolName === "search_restaurants" ? 8 : 12);
+    const toolCallId = selectedToolCall.id || `local_${toolName}_${Date.now()}`;
+
+    let toolPayload;
+    if (toolName === "search_restaurants") {
+      const restaurants = await searchRestaurantsTool(query, limit);
+      toolPayload = {
+        query,
+        fetchedCount: restaurants.fetchedCount,
+        count: restaurants.results.length,
+        restaurants: restaurants.results,
+      };
+    } else {
+      const items = await searchFoodItemsTool(query, limit);
+      toolPayload = {
+        query,
+        fetchedCount: items.fetchedCount,
+        count: items.results.length,
+        items: items.results,
+      };
+    }
+    toolTrace.push({
+      tool: toolName,
+      query,
+      limit,
+      fetchedCount: toolPayload.fetchedCount,
+      count: toolPayload.count,
+    });
+    console.log(
+      `Smart-order tool call: ${toolName} query="${query}" fetched=${toolPayload.fetchedCount} ranked=${toolPayload.count}`
+    );
+
+    messages.push({
+      role: "assistant",
+      content: assistantMessage.content || "",
+      tool_calls: [
+        {
+          id: toolCallId,
+          type: "function",
+          function: {
+            name: toolName,
+            arguments: JSON.stringify({ query, limit }),
+          },
+        },
+      ],
+    });
+
+    messages.push({
+      role: "tool",
+      tool_call_id: toolCallId,
+      name: toolName,
+      content: JSON.stringify(toolPayload),
+    });
+  }
+
+  messages.push({
+    role: "system",
+    content:
+      "Now return only the final JSON object with keys status, restaurantName, items, clarification.",
+  });
+
+  const finalMessage = await requestCompletion("none", { type: "json_object" });
+  const parsed = extractJsonCandidate(finalMessage?.content || "");
   if (!parsed || typeof parsed !== "object") {
     throw new Error("OpenAI response did not contain valid JSON.");
   }
 
-  return parsed;
+  return { parsed, toolTrace };
 }
 
 function buildDraftFromAi(parsed, prompt, catalog) {
   const status = String(parsed?.status || "").toLowerCase();
-  if (status === "clarify") {
-    return {
-      clarification:
-        parsed.clarification ||
-        "Please include restaurant name and menu items so I can build your order.",
-    };
-  }
-
   const restaurantName =
     parsed?.restaurantName || parsed?.restaurant || parsed?.restaurant_name;
   const matchedRestaurant = bestTextMatch(restaurantName, catalog, (r) => r.name);
-  if (!matchedRestaurant) {
-    return {
-      clarification:
-        "I couldn't map the restaurant from that request. Please mention the exact restaurant name.",
-    };
-  }
 
   const rawItems = Array.isArray(parsed?.items) ? parsed.items : [];
-  if (!rawItems.length) {
-    return {
-      clarification:
-        `I found ${matchedRestaurant.name} but no valid items. Please mention item names from that menu.`,
-    };
-  }
 
-  const byItemName = new Map();
-  const missingItems = [];
+  if (matchedRestaurant && rawItems.length) {
+    const byItemName = new Map();
+    const missingItems = [];
 
-  for (const item of rawItems) {
-    const itemName = item?.name || item?.itemName || item?.item;
-    const matchedItem = bestTextMatch(itemName, matchedRestaurant.menu, (m) => m.name);
-    if (!matchedItem) {
-      if (itemName) missingItems.push(String(itemName));
-      continue;
+    for (const item of rawItems) {
+      const itemName = item?.name || item?.itemName || item?.item;
+      const matchedItem = bestTextMatch(itemName, matchedRestaurant.menu, (m) => m.name);
+      if (!matchedItem) {
+        if (itemName) missingItems.push(String(itemName));
+        continue;
+      }
+
+      const quantity = asPositiveInt(item?.quantity || item?.qty || 1, 1);
+      const existing = byItemName.get(matchedItem.name);
+      if (existing) {
+        existing.quantity += quantity;
+      } else {
+        byItemName.set(matchedItem.name, {
+          name: matchedItem.name,
+          price: Number(matchedItem.price) || 0,
+          quantity,
+        });
+      }
     }
 
-    const quantity = asPositiveInt(item?.quantity || item?.qty || 1, 1);
-    const existing = byItemName.get(matchedItem.name);
-    if (existing) {
-      existing.quantity += quantity;
-    } else {
-      byItemName.set(matchedItem.name, {
-        name: matchedItem.name,
-        price: Number(matchedItem.price) || 0,
-        quantity,
-      });
+    const items = [...byItemName.values()];
+    if (items.length) {
+      const total = items.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+        0
+      );
+
+      const skipped = missingItems.length
+        ? ` I skipped unmatched items: ${missingItems.join(", ")}.`
+        : "";
+
+      return {
+        draft: {
+          restaurant: {
+            _id: matchedRestaurant._id,
+            name: matchedRestaurant.name,
+          },
+          items,
+          total,
+          prompt,
+        },
+        assistantText:
+          parsed?.clarification ||
+          `Draft ready from ${matchedRestaurant.name}.${skipped}`.trim(),
+      };
     }
   }
 
-  const items = [...byItemName.values()];
-  if (!items.length) {
+  const focusedCatalog = matchedRestaurant ? [matchedRestaurant] : catalog;
+  const focusedFallback = buildBestMatchFallbackDraft(prompt, focusedCatalog, {
+    restaurantHint: restaurantName,
+    rawItems,
+  });
+  if (focusedFallback) return focusedFallback;
+
+  const globalFallback = buildBestMatchFallbackDraft(prompt, catalog, {
+    restaurantHint: restaurantName,
+    rawItems,
+  });
+  if (globalFallback) return globalFallback;
+
+  if (status === "clarify") {
     return {
       clarification:
-        `I couldn't map requested items to ${matchedRestaurant.name}'s menu. Try exact menu item names.`,
+        parsed?.clarification ||
+        "I couldn't confidently map that request to a menu item. Try a more specific food name.",
     };
   }
-
-  const total = items.reduce(
-    (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
-    0
-  );
-
-  const skipped = missingItems.length
-    ? ` I skipped unmatched items: ${missingItems.join(", ")}.`
-    : "";
 
   return {
-    draft: {
-      restaurant: {
-        _id: matchedRestaurant._id,
-        name: matchedRestaurant.name,
-      },
-      items,
-      total,
-      prompt,
-    },
-    assistantText:
-      parsed?.clarification ||
-      `Draft ready from ${matchedRestaurant.name}.${skipped}`.trim(),
+    clarification:
+      "I couldn't map that request to a menu item. Try adding one or two food keywords.",
   };
 }
 
@@ -306,8 +737,8 @@ app.post("/api/ai/smart-order", async (req, res) => {
   }
 
   try {
-    const parsed = await callOpenAiSmartOrder(prompt, catalog);
-    const result = buildDraftFromAi(parsed, prompt, catalog);
+    const ai = await callOpenAiSmartOrder(prompt, catalog);
+    const result = buildDraftFromAi(ai.parsed, prompt, catalog);
 
     if (result.draft) {
       return res.json({
@@ -315,6 +746,7 @@ app.post("/api/ai/smart-order", async (req, res) => {
         draft: result.draft,
         assistantText: result.assistantText,
         provider: "openai",
+        toolTrace: ai.toolTrace,
       });
     }
 
@@ -322,6 +754,7 @@ app.post("/api/ai/smart-order", async (req, res) => {
       mode: "clarify",
       clarification: result.clarification,
       provider: "openai",
+      toolTrace: ai.toolTrace,
     });
   } catch (error) {
     console.error("Smart order AI error:", error.message);
