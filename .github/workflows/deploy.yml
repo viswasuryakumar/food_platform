@@ -1,0 +1,99 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_all:
+        description: "Deploy all services (ignore change detection)"
+        required: false
+        default: "true"
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api-gateway: ${{ steps.filter.outputs.api-gateway }}
+      user-service: ${{ steps.filter.outputs.user-service }}
+      restaurant-service: ${{ steps.filter.outputs.restaurant-service }}
+      order-service: ${{ steps.filter.outputs.order-service }}
+      payment-service: ${{ steps.filter.outputs.payment-service }}
+      notification-service: ${{ steps.filter.outputs.notification-service }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            api-gateway:
+              - 'api-gateway/**'
+            user-service:
+              - 'services/user-service/**'
+            restaurant-service:
+              - 'services/restaurant-service/**'
+            order-service:
+              - 'services/order-service/**'
+            payment-service:
+              - 'services/payment-service/**'
+            notification-service:
+              - 'services/notification-service/**'
+            frontend:
+              - 'frontend/**'
+
+  deploy-api-gateway:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.api-gateway == 'true' || github.event.inputs.deploy_all == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy api-gateway
+        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK_API_GATEWAY }}"
+
+  deploy-user-service:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.user-service == 'true' || github.event.inputs.deploy_all == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy user-service
+        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK_USER_SERVICE }}"
+
+  deploy-restaurant-service:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.restaurant-service == 'true' || github.event.inputs.deploy_all == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy restaurant-service
+        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK_RESTAURANT_SERVICE }}"
+
+  deploy-order-service:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.order-service == 'true' || github.event.inputs.deploy_all == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy order-service
+        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK_ORDER_SERVICE }}"
+
+  deploy-payment-service:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.payment-service == 'true' || github.event.inputs.deploy_all == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy payment-service
+        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK_PAYMENT_SERVICE }}"
+
+  deploy-notification-service:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.notification-service == 'true' || github.event.inputs.deploy_all == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy notification-service
+        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK_NOTIFICATION_SERVICE }}"
+
+  deploy-frontend:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true' || github.event.inputs.deploy_all == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy frontend
+        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND }}"
