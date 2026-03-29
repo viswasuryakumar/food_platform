@@ -24,7 +24,7 @@ The platform enables users to:
 - Track order status dynamically
 - Perform seamless payment transactions
 
-Additionally, the system supports an optional **AI-powered recommendation engine** to enhance search, personalization, and user experience.
+Additionally, the system supports an **AI-powered recommendation engine** to enhance search, personalization, and user experience.
 
 ---
 ## 🏗️ 3. System Architecture Overview
@@ -78,7 +78,7 @@ Microservices architecture
 
 API Gateway pattern
 
-AI Integration (Optional)
+AI Integration
 
 OpenAI-based recommendation system
 
@@ -94,7 +94,7 @@ Payment simulation
 
 Admin-level controls
 
-AI-powered intelligent search (optional)
+AI-powered intelligent search
 
 ## 📋 7. Prerequisites
 
