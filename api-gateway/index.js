@@ -154,125 +154,41 @@ function extractJsonCandidate(raw) {
   return null;
 }
 
-async function callOpenAiSmartOrder(prompt, catalog) {
-  const systemPrompt = [
-    "You convert food-order chat requests into structured JSON.",
-    "Use only the provided restaurant catalog and menu items.",
-    "If request is unclear or missing a mappable restaurant/menu item, return status='clarify'.",
-    "Output strict JSON only with keys:",
-    "status ('draft' or 'clarify'), restaurantName, items, clarification.",
-    "For draft: restaurantName must exactly match one catalog restaurant name.",
-    "For draft: each item name must exactly match one menu item name from that restaurant.",
-    "Quantity must be an integer 1..20.",
-  ].join(" ");
-
-  const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      "HTTP-Referer": "https://food-platform.app",
-      "X-Title": "Food Platform",
-    },
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      temperature: 0,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: JSON.stringify({ prompt, restaurants: catalog }),
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => "");
-    throw new Error(`OpenAI request failed (${response.status}): ${errorBody.slice(0, 200)}`);
-  }
-
-  const payload = await response.json();
-  const content = payload?.choices?.[0]?.message?.content || "";
-  const parsed = extractJsonCandidate(content);
-  if (!parsed || typeof parsed !== "object") {
-    throw new Error("OpenAI response did not contain valid JSON.");
-  }
-
-  return parsed;
-}
-
-function buildDraftFromAi(parsed, prompt, catalog) {
-  const status = String(parsed?.status || "").toLowerCase();
-  if (status === "clarify") {
-    return {
-      clarification:
-        parsed.clarification ||
-        "Please include restaurant name and menu items so I can build your order.",
-    };
-  }
-
-  const restaurantName =
-    parsed?.restaurantName || parsed?.restaurant || parsed?.restaurant_name;
-  const matchedRestaurant = bestTextMatch(restaurantName, catalog, (r) => r.name);
+function localSmartOrder(prompt, catalog) {
+  const normalizedPrompt = prompt.toLowerCase();
+  
+  // 1. Try to find a restaurant in the prompt
+  const matchedRestaurant = bestTextMatch(prompt, catalog, (r) => r.name);
   if (!matchedRestaurant) {
     return {
-      clarification:
-        "I couldn't map the restaurant from that request. Please mention the exact restaurant name.",
+      mode: "clarify",
+      clarification: "I couldn't find that restaurant. Could you please specify which one you mean?",
     };
   }
 
-  const rawItems = Array.isArray(parsed?.items) ? parsed.items : [];
-  if (!rawItems.length) {
-    return {
-      clarification:
-        `I found ${matchedRestaurant.name} but no valid items. Please mention item names from that menu.`,
-    };
-  }
-
-  const byItemName = new Map();
-  const missingItems = [];
-
-  for (const item of rawItems) {
-    const itemName = item?.name || item?.itemName || item?.item;
-    const matchedItem = bestTextMatch(itemName, matchedRestaurant.menu, (m) => m.name);
-    if (!matchedItem) {
-      if (itemName) missingItems.push(String(itemName));
-      continue;
-    }
-
-    const quantity = asPositiveInt(item?.quantity || item?.qty || 1, 1);
-    const existing = byItemName.get(matchedItem.name);
-    if (existing) {
-      existing.quantity += quantity;
-    } else {
-      byItemName.set(matchedItem.name, {
-        name: matchedItem.name,
-        price: Number(matchedItem.price) || 0,
-        quantity,
+  // 2. Try to find menu items from that restaurant in the prompt
+  const items = [];
+  for (const menuItem of matchedRestaurant.menu) {
+    if (normalizedPrompt.includes(menuItem.name.toLowerCase())) {
+      items.push({
+        name: menuItem.name,
+        price: menuItem.price,
+        quantity: 1 // Default to 1 for basic smart search
       });
     }
   }
 
-  const items = [...byItemName.values()];
-  if (!items.length) {
+  if (items.length === 0) {
     return {
-      clarification:
-        `I couldn't map requested items to ${matchedRestaurant.name}'s menu. Try exact menu item names.`,
+      mode: "clarify",
+      clarification: `I found ${matchedRestaurant.name}, but I didn't see any matching items in your request.`,
     };
   }
 
-  const total = items.reduce(
-    (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
-    0
-  );
-
-  const skipped = missingItems.length
-    ? ` I skipped unmatched items: ${missingItems.join(", ")}.`
-    : "";
+  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   return {
+    mode: "draft",
     draft: {
       restaurant: {
         _id: matchedRestaurant._id,
@@ -282,9 +198,7 @@ function buildDraftFromAi(parsed, prompt, catalog) {
       total,
       prompt,
     },
-    assistantText:
-      parsed?.clarification ||
-      `Draft ready from ${matchedRestaurant.name}.${skipped}`.trim(),
+    assistantText: `Local Search: Found items at ${matchedRestaurant.name}. Ready to checkout!`,
   };
 }
 
@@ -292,45 +206,17 @@ app.post("/api/ai/smart-order", async (req, res) => {
   const prompt = String(req.body?.prompt || "").trim();
   const catalog = sanitizeCatalog(req.body?.restaurants);
 
-  if (!prompt) {
-    return res.status(400).json({ error: "Prompt is required." });
-  }
-
-  if (!catalog.length) {
-    return res.status(400).json({ error: "Restaurant catalog is required." });
-  }
-
-  if (!OPENAI_API_KEY) {
-    return res.status(503).json({
-      error: "Smart Order AI is not configured. Add OPENAI_API_KEY in api-gateway/.env.",
-      code: "OPENAI_NOT_CONFIGURED",
-    });
+  if (!prompt || !catalog.length) {
+    return res.status(400).json({ error: "Prompt and catalog are required." });
   }
 
   try {
-    const parsed = await callOpenAiSmartOrder(prompt, catalog);
-    const result = buildDraftFromAi(parsed, prompt, catalog);
-
-    if (result.draft) {
-      return res.json({
-        mode: "draft",
-        draft: result.draft,
-        assistantText: result.assistantText,
-        provider: "openai",
-      });
-    }
-
-    return res.json({
-      mode: "clarify",
-      clarification: result.clarification,
-      provider: "openai",
-    });
+    // We now use the local matching logic instead of OpenAI
+    const result = localSmartOrder(prompt, catalog);
+    return res.json(result);
   } catch (error) {
-    console.error("Smart order AI error:", error.message);
-    return res.status(502).json({
-      error: "Smart Order AI request failed.",
-      code: "OPENAI_REQUEST_FAILED",
-    });
+    console.error("Local smart order error:", error.message);
+    return res.status(500).json({ error: "Smart Order processing failed." });
   }
 });
 

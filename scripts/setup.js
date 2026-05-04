@@ -26,7 +26,7 @@ const envTemplates = [
     file: "api-gateway/.env",
     content: [
       "PORT=3000",
-      "JWT_SECRET=dev_secret_123",
+      "JWT_SECRET=supersecretkey123",
       "USER_SERVICE_URL=http://localhost:3001",
       "RESTAURANT_SERVICE_URL=http://localhost:3002",
       "ORDER_SERVICE_URL=http://localhost:3003",
@@ -41,8 +41,8 @@ const envTemplates = [
     file: "services/user-service/.env",
     content: [
       "PORT=3001",
-      "MONGO_URI=mongodb://127.0.0.1:27017/food_user",
-      "JWT_SECRET=dev_secret_123",
+      "MONGO_URI=mongodb+srv://viswasurya01:Vissu1234%25@cluster0.0ecxwdw.mongodb.net/280?retryWrites=true&w=majority&appName=Cluster0",
+      "JWT_SECRET=supersecretkey123",
       "",
     ].join("\n"),
   },
@@ -50,7 +50,7 @@ const envTemplates = [
     file: "services/restaurant-service/.env",
     content: [
       "PORT=3002",
-      "MONGO_URI=mongodb://127.0.0.1:27017/food_restaurant",
+      "MONGO_URI=mongodb+srv://viswasurya01:Vissu1234%25@cluster0.0ecxwdw.mongodb.net/280?retryWrites=true&w=majority&appName=Cluster0",
       "",
     ].join("\n"),
   },
@@ -58,7 +58,7 @@ const envTemplates = [
     file: "services/order-service/.env",
     content: [
       "PORT=3003",
-      "MONGO_URI=mongodb://127.0.0.1:27017/food_order",
+      "MONGO_URI=mongodb+srv://viswasurya01:Vissu1234%25@cluster0.0ecxwdw.mongodb.net/280?retryWrites=true&w=majority&appName=Cluster0",
       "",
     ].join("\n"),
   },
@@ -66,7 +66,7 @@ const envTemplates = [
     file: "services/payment-service/.env",
     content: [
       "PORT=3004",
-      "MONGO_URI=mongodb://127.0.0.1:27017/food_payment",
+      "MONGO_URI=mongodb+srv://viswasurya01:Vissu1234%25@cluster0.0ecxwdw.mongodb.net/280?retryWrites=true&w=majority&appName=Cluster0",
       "",
     ].join("\n"),
   },
@@ -81,7 +81,7 @@ function runCommand(command, args, cwd) {
     const child = spawn(command, args, {
       cwd,
       stdio: "inherit",
-      shell: false,
+      shell: true,
     });
 
     child.on("error", reject);
@@ -138,7 +138,6 @@ async function main() {
     console.log("Dependency install was skipped (--env-only).");
   } else {
     console.log("Start MongoDB, then run:");
-    console.log("  npm run db:start");
     console.log("  npm run dev");
   }
 }

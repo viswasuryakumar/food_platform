@@ -16,7 +16,7 @@ const DB_RETRY_DELAY_MS = Number(process.env.DB_RETRY_DELAY_MS || 2000);
 
 // ---------- REGISTER ROUTE ----------
 app.post("/auth/register", async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, role } = req.body;
 
   // 1. Check if email already exists
   const exists = await User.findOne({ email });
@@ -26,7 +26,7 @@ app.post("/auth/register", async (req, res) => {
   const hashed = await bcrypt.hash(password, 10);
 
   // 3. Save user
-  const user = new User({ name, email, password: hashed });
+  const user = new User({ name, email, password: hashed, role: role || "user" });
   await user.save();
 
   res.json({ message: "User registered" });

@@ -1,23 +1,27 @@
 # Node modules
 node_modules/
+**/node_modules/
 
 # Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
 
 # Environment variables
 .env
+**/.env
+.env.local
+.env.*.local
 
 # Build folders
 dist/
 build/
+**/dist/
+**/build/
 
 # Mac system files
 .DS_Store
-
-# Logs
-*.log
 
 # VS Code settings
 .vscode/
@@ -27,3 +31,7 @@ build/
 
 # Local MongoDB runtime files
 .mongodb/
+
+# Python
+__pycache__/
+*.pyc

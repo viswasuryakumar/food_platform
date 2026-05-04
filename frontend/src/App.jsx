@@ -9,6 +9,7 @@ import AdminDashboard from "./pages/AdminDashboard.jsx";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import Navbar from "./components/Navbar"; 
 import OrderHistory from "./pages/OrderHistory.jsx";
+import Chatbot from "./components/Chatbot";
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="/history" element={<OrderHistory />} />
           </Routes>
         </main>
+        <Chatbot />
       </div>
     </BrowserRouter>
   );

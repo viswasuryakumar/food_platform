@@ -1,0 +1,11 @@
+{
+  "name": "ai-agent",
+  "version": "1.0.0",
+  "main": "agent.py",
+  "scripts": {
+    "dev": "python -u agent.py"
+  },
+  "dependencies": {
+    "mongodb-mcp-server": "^1.10.0"
+  }
+}

@@ -54,15 +54,20 @@ export default function OrderPage() {
   useEffect(() => {
     setDraftApplied(false);
     setDraftNotice("");
-  }, [restaurantId]);
+    setItems([]); // Clear cart when switching restaurants
+  }, [restaurantId, location.key]);
 
   useEffect(() => {
-    if (!restaurant || draftApplied) return;
+    if (!restaurant) return;
+    
+    // If we have a draft from the location state, use it
     if (!draftItems.length) {
+      // Only set applied true if we have no draft to process
       setDraftApplied(true);
       return;
     }
 
+    // Process the draft items
     const menuByName = new Map(
       (restaurant.menu || []).map((item) => [normalizeName(item.name), item])
     );
@@ -72,30 +77,29 @@ export default function OrderPage() {
 
     for (const draftItem of draftItems) {
       const matchedItem = menuByName.get(normalizeName(draftItem.name));
-      if (!matchedItem) {
+      if (matchedItem) {
+        hydrated.push({
+          ...matchedItem,
+          quantity: Math.max(1, Number(draftItem.quantity) || 1),
+        });
+      } else {
         missing.push(draftItem.name);
-        continue;
       }
-
-      hydrated.push({
-        ...matchedItem,
-        quantity: Math.max(1, Number(draftItem.quantity) || 1),
-      });
     }
 
     if (hydrated.length > 0) {
       setItems(hydrated);
       setDraftNotice(
         missing.length
-          ? `Assistant draft loaded. Skipped unavailable items: ${missing.join(", ")}.`
-          : "Assistant draft loaded into your cart."
+          ? `Assistant draft loaded. Skipped unavailable: ${missing.join(", ")}.`
+          : "Assistant draft loaded into your cart!"
       );
-    } else {
-      setDraftNotice("Couldn't map the assistant draft to this menu. Please add items manually.");
+    } else if (draftItems.length > 0) {
+      setDraftNotice("Couldn't map the assistant's items to this menu.");
     }
 
     setDraftApplied(true);
-  }, [restaurant, draftItems, draftApplied]);
+  }, [restaurant, draftItems, location.key]); // Use location.key to detect new navigations to same URL
 
   function addItem(item) {
     const existing = items.find((i) => i.name === item.name);

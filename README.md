@@ -108,16 +108,9 @@ MongoDB (running locally)
 Step 1: Clone Repository
 git clone https://github.com/viswasuryakumar/food_platform.git
 cd food_platform
-Step 2: Start MongoDB
-macOS
-brew services start mongodb-community
-Windows
-net start MongoDB
-Step 3: Install Dependencies
+Step 2: Install Dependencies
 npm run setup
-Step 4: Seed Database
-npm run seed
-Step 5: Start Application
+Step 3: Start Application
 npm run dev
 🌐 Access Points
 
@@ -141,11 +134,8 @@ Restart the application after updating.
 ## ⚡ 10. Quick Commands
 Command	Description
 npm run setup	Install dependencies and generate .env files
-npm run db:start	Start MongoDB locally
 npm run dev	Run all services and frontend
 npm run setup:run	Setup and run in one command
-npm run seed	Insert demo data
-npm run seed:reset	Reset and reseed database
 
 ## ⚠️ 11. Limitations
 

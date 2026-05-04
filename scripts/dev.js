@@ -14,6 +14,7 @@ const apps = [
   { name: "order", dir: "services/order-service" },
   { name: "payment", dir: "services/payment-service" },
   { name: "notification", dir: "services/notification-service" },
+  { name: "ai", dir: "services/ai-agent" },
   { name: "frontend", dir: "frontend" },
 ];
 
@@ -66,7 +67,7 @@ for (const app of apps) {
     cwd: path.join(rootDir, app.dir),
     env: process.env,
     stdio: ["ignore", "pipe", "pipe"],
-    shell: false,
+    shell: true,
   });
 
   children.push(child);
