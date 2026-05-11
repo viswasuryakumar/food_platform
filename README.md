@@ -141,17 +141,7 @@ npm run setup:run	Setup and run in one command
 
 Limited production-grade error handling
 
-## 🔮 12. Future Enhancements
-
-Cloud deployment (AWS EC2 + Load Balancer)
-
-Integration with real payment systems (Stripe)
-
-Notification system (Email/SMS)
-
-Advanced AI-driven recommendations
-
-## 👥 13. Team
+## 👥 12. Team
 
 Team Name: Team 4 - Mitochondria
 
@@ -165,6 +155,6 @@ Harsha Vardhan Badithaboina
 
 Sanjushree Golla
 
-## 📌 14. Conclusion
+## 📌 13. Conclusion
 
-This project demonstrates the design and implementation of a modern, scalable food ordering system using microservices architecture. It integrates full-stack development principles with optional AI capabilities, making it suitable for real-world applications and future enhancements.
+This project demonstrates the design and implementation of a modern, scalable food ordering system using microservices architecture. It integrates full-stack development principles with AI capabilities, making it suitable for real-world applications and future enhancements.
