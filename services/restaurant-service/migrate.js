@@ -9,8 +9,27 @@ async function run() {
   
   const restaurants = await Restaurant.find({});
   for (const r of restaurants) {
+    let modified = false;
     if (r.name) {
-      r.name_normalized = r.name.toLowerCase().trim();
+      const newNameNorm = r.name.toLowerCase().trim();
+      if (r.name_normalized !== newNameNorm) {
+        r.name_normalized = newNameNorm;
+        modified = true;
+      }
+    }
+    if (r.cuisine) {
+      const newCuisineNorm = r.cuisine.toLowerCase().trim();
+      if (r.cuisine_normalized !== newCuisineNorm) {
+        r.cuisine_normalized = newCuisineNorm;
+        modified = true;
+      }
+    } else {
+      if (r.cuisine_normalized !== "") {
+        r.cuisine_normalized = "";
+        modified = true;
+      }
+    }
+    if (modified) {
       await r.save();
     }
   }

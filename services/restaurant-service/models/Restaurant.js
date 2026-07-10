@@ -5,6 +5,7 @@ const restaurantSchema = new mongoose.Schema({
   name_normalized: { type: String, index: true },
   address: { type: String, required: true },
   cuisine: { type: String },
+  cuisine_normalized: { type: String, index: true },
   image: { type: String },
   createdAt: { type: Date, default: Date.now },
   createdBy: { type: String, required: true },
@@ -19,6 +20,11 @@ const restaurantSchema = new mongoose.Schema({
 restaurantSchema.pre('save', function() {
   if (this.name && (this.isModified('name') || this.isNew)) {
     this.name_normalized = this.name.toLowerCase().trim();
+  }
+  if (this.cuisine && (this.isModified('cuisine') || this.isNew)) {
+    this.cuisine_normalized = this.cuisine.toLowerCase().trim();
+  } else if (!this.cuisine) {
+    this.cuisine_normalized = "";
   }
 });
 

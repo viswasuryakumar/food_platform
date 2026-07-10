@@ -1,23 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import ReactMarkdown from 'react-markdown';
 import './Chatbot.css';
 
 const AI_BASE = 'http://localhost:8000';
 
+const INITIAL_MESSAGE = { text: "Hi! I'm your **AI Food Assistant**. Ask me anything — restaurants, prices, menu items!", sender: 'bot' };
+
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    { text: "Hi! I'm your **AI Food Assistant**. Ask me anything — restaurants, prices, menu items!", sender: 'bot' }
-  ]);
+  const [messages, setMessages] = useState([INITIAL_MESSAGE]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const navigate = useNavigate();
+  const user = useSelector((state) => state.auth.user);
+  // Each user gets their own thread; fall back to a generic id if somehow missing.
+  const threadId = user?.id || user?._id || 'anonymous';
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  // Reset conversation whenever the logged-in user changes (e.g. after logout→login)
+  useEffect(() => {
+    setMessages([INITIAL_MESSAGE]);
+    setIsOpen(false);
+  }, [threadId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -43,7 +53,7 @@ const Chatbot = () => {
       const response = await fetch(`${AI_BASE}/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage, thread_id: 'user_session_v1' }),
+        body: JSON.stringify({ message: userMessage, thread_id: threadId }),
       });
 
       if (!response.ok) throw new Error(`Server error: ${response.status}`);

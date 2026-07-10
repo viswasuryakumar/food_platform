@@ -50,7 +50,8 @@ async def initialize_agent():
     mcp_servers = {
         "mongodb": {
             "command": "node",
-            "args": ["node_modules/mongodb-mcp-server/dist/index.js", "--connectionString", os.getenv("MONGO_URI")],
+            # the package installs its main ESM file under dist/esm
+            "args": ["node_modules/mongodb-mcp-server/dist/esm/index.js", "--connectionString", os.getenv("MONGO_URI")],
             "transport": "stdio",
         }
     }

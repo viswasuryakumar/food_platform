@@ -33,10 +33,42 @@ app.post("/restaurants", async (req, res) => {
 });
 
 
-// Get all restaurants
+// Get all restaurants (unchanged - used by admin, AI catalog, etc.)
 app.get("/restaurants", async (req, res) => {
   const restaurants = await Restaurant.find();
   res.json(restaurants);
+});
+
+// Server-side paginated search (MUST be before /:id so 'search' isn't treated as an id)
+app.get("/restaurants/search", async (req, res) => {
+  try {
+    const raw = String(req.query.q || "").toLowerCase().trim();
+    const page  = Math.max(1, parseInt(req.query.page,  10) || 1);
+    const limit = Math.min(20, Math.max(1, parseInt(req.query.limit, 10) || 12));
+    const skip  = (page - 1) * limit;
+
+    // Build query: if empty, return all; otherwise prefix-match on indexed fields
+    let query = {};
+    if (raw) {
+      const regex = new RegExp("^" + raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      query = { $or: [{ name_normalized: regex }, { cuisine_normalized: regex }] };
+    }
+
+    const [restaurants, total] = await Promise.all([
+      Restaurant.find(query, { menu: 0 }).skip(skip).limit(limit).lean(),
+      Restaurant.countDocuments(query),
+    ]);
+
+    res.json({
+      restaurants,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error("Search error:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 // Get one restaurant

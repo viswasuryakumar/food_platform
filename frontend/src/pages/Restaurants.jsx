@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import RestaurantCard from "../components/RestaurantCard";
@@ -153,39 +153,78 @@ function buildDraft(prompt, restaurants) {
 
 export default function Restaurants() {
   const navigate = useNavigate();
+
+  // ---------- Normal search state ----------
   const [restaurants, setRestaurants] = useState([]);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState(""); // bound directly to input
+  const [search, setSearch] = useState("");           // debounced value
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // ---------- Smart Order / assistant state ----------
   const [assistantEnabled, setAssistantEnabled] = useState(false);
   const [assistantPrompt, setAssistantPrompt] = useState("");
   const [assistantMessages, setAssistantMessages] = useState([]);
   const [assistantLoading, setAssistantLoading] = useState(false);
   const [draftOrder, setDraftOrder] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  // Full catalog kept separately for Smart Order — never displayed in the grid
+  const [catalog, setCatalog] = useState([]);
 
+  // Debounce: update `search` 300 ms after the user stops typing
+  const debounceRef = useRef(null);
+  function handleSearchInput(e) {
+    const value = e.target.value;
+    setSearchInput(value);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearch(value);
+      setPage(1); // reset to first page on new query
+    }, 300);
+  }
+
+  // Server-side search: fires whenever `search` or `page` changes
   useEffect(() => {
+    let cancelled = false;
     async function fetchRestaurants() {
       setLoading(true);
       setError("");
       try {
-        const res = await api.get("/api/restaurants");
-        setRestaurants(res.data || []);
+        const params = new URLSearchParams({ page, limit: 12 });
+        if (search.trim()) params.set("q", search.trim());
+        const res = await api.get(`/api/restaurants/search?${params}`);
+        if (cancelled) return;
+        const data = res.data || {};
+        setRestaurants(data.restaurants || []);
+        setTotalPages(data.pages || 1);
       } catch (err) {
+        if (cancelled) return;
         console.error("Error fetching restaurants:", err);
         setError("Could not load restaurants right now.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
-
     fetchRestaurants();
-  }, []);
+    return () => { cancelled = true; };
+  }, [search, page]);
 
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return restaurants;
-    return restaurants.filter((rest) => rest.name.toLowerCase().includes(query));
-  }, [search, restaurants]);
+  // Fetch the full catalog (with menus) lazily when Smart Order is opened
+  const catalogFetchedRef = useRef(false);
+  useEffect(() => {
+    if (!assistantEnabled || catalogFetchedRef.current) return;
+    catalogFetchedRef.current = true;
+    async function fetchCatalog() {
+      try {
+        const res = await api.get("/api/restaurants");
+        setCatalog(res.data || []);
+      } catch (err) {
+        console.error("Error fetching catalog for Smart Order:", err);
+      }
+    }
+    fetchCatalog();
+  }, [assistantEnabled]);
 
   function pushAssistantMessages(userText, assistantText) {
     setAssistantMessages((prev) =>
@@ -198,7 +237,8 @@ export default function Restaurants() {
   }
 
   function applyLocalDraft(prompt, prefix = "") {
-    const result = buildDraft(prompt, restaurants);
+    // Use the full catalog (with menus) for local draft building in Smart Order
+    const result = buildDraft(prompt, catalog);
     if (result.error) {
       setDraftOrder(null);
       pushAssistantMessages(prompt, `${prefix}${result.error}`.trim());
@@ -221,7 +261,8 @@ export default function Restaurants() {
 
     setAssistantLoading(true);
     try {
-      const catalog = restaurants.map((restaurant) => ({
+      // Use the pre-fetched full catalog (with menus) for Smart Order
+      const catalogPayload = catalog.map((restaurant) => ({
         _id: restaurant._id,
         name: restaurant.name,
         menu: (restaurant.menu || []).map((item) => ({
@@ -232,7 +273,7 @@ export default function Restaurants() {
 
       const response = await api.post("/api/ai/smart-order", {
         prompt,
-        restaurants: catalog,
+        restaurants: catalogPayload,
       });
 
       const data = response.data || {};
@@ -336,11 +377,12 @@ export default function Restaurants() {
                 Smart Order
               </button>
               <input
+                id="restaurant-search"
                 type="text"
-                placeholder="Type a restaurant name..."
+                placeholder="Type a restaurant name or cuisine..."
                 className="input-field pl-32"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchInput}
+                onChange={handleSearchInput}
               />
             </div>
           )}
@@ -409,16 +451,41 @@ export default function Restaurants() {
             <div key={i} className="surface h-44 animate-pulse" />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : restaurants.length === 0 ? (
         <div className="surface p-8 text-center">
           <p className="text-lg font-semibold">No restaurants found</p>
           <p className="muted mt-1 text-sm">Try another search term.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((rest) => (
+          {restaurants.map((rest) => (
             <RestaurantCard key={rest._id} rest={rest} />
           ))}
+        </div>
+      )}
+
+      {/* Pagination controls */}
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <button
+            id="search-prev-page"
+            className="btn-soft"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            ← Previous
+          </button>
+          <span className="text-sm text-[#75685c]">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            id="search-next-page"
+            className="btn-soft"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            Next →
+          </button>
         </div>
       )}
     </section>

@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useSelector } from "react-redux";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Restaurants from "./pages/Restaurants";
@@ -7,11 +8,13 @@ import TrackOrder from "./pages/TrackOrder.jsx";
 import PaymentPage from "./pages/PaymentPage.jsx";
 import AdminDashboard from "./pages/AdminDashboard.jsx";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
-import Navbar from "./components/Navbar"; 
+import Navbar from "./components/Navbar";
 import OrderHistory from "./pages/OrderHistory.jsx";
 import Chatbot from "./components/Chatbot";
 
 export default function App() {
+  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+
   return (
     <BrowserRouter>
       <div className="min-h-screen pb-10">
@@ -36,7 +39,7 @@ export default function App() {
             <Route path="/history" element={<OrderHistory />} />
           </Routes>
         </main>
-        <Chatbot />
+        {isAuthenticated && <Chatbot />}
       </div>
     </BrowserRouter>
   );
