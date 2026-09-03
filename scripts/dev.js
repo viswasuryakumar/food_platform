@@ -78,16 +78,18 @@ for (const app of apps) {
     if (isShuttingDown) return;
     if (code === 0 || signal === "SIGTERM" || signal === "SIGINT") return;
 
+    // One service crashing no longer tears down the whole stack. Previously a
+    // single syntax error killed all eight processes, which made it far harder
+    // to see which one actually failed.
     console.error(
-      `\n[${app.name}] exited unexpectedly (code: ${code ?? "null"}, signal: ${signal ?? "none"})`
+      `\n[${app.name}] exited unexpectedly (code: ${code ?? "null"}, signal: ${signal ?? "none"}).` +
+        ` Other services are still running; fix and they will reload.\n`
     );
-    shutdown("error");
   });
 
   child.on("error", (error) => {
     if (isShuttingDown) return;
-    console.error(`\n[${app.name}] failed to start: ${error.message}`);
-    shutdown("error");
+    console.error(`\n[${app.name}] failed to start: ${error.message}\n`);
   });
 }
 

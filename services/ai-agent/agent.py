@@ -23,7 +23,7 @@ app = FastAPI(title="AI Food Agent Service")
 # Enable CORS for frontend interaction
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[origin.strip() for origin in os.getenv("CORS_ORIGIN", "http://localhost:5173").split(",")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,6 +40,16 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "ai-agent"}
+
+@app.get("/health/ready")
+async def readiness():
+    if agent_executor is None:
+        raise HTTPException(status_code=503, detail="AI agent is still initializing")
+    return {"status": "ready", "service": "ai-agent"}
 
 async def initialize_agent():
     global agent_executor, mcp_client

@@ -1,114 +1,53 @@
 require("dotenv").config();
-const express = require("express");
 const mongoose = require("mongoose");
-const cors = require("cors");
-const axios = require("axios");
+const app = require("./app");
 
-
-const Order = require("./models/Order");
-
-const app = express();
-app.use(cors());
-app.use(express.json());
 mongoose.set("bufferCommands", false);
+
+const PORT = process.env.PORT || 3003;
 const DB_RETRY_DELAY_MS = Number(process.env.DB_RETRY_DELAY_MS || 2000);
+const MAX_DB_ATTEMPTS = Number(process.env.DB_MAX_ATTEMPTS || 15);
 
-// GET ALL ORDERS (ADMIN)
-app.get("/orders", async (req, res) => {
-  try {
-    const orders = await Order.find();
-    res.json(orders);
-  } catch (err) {
-    console.error("Fetch orders error:", err);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-// ----------- CREATE ORDER -----------
-app.post("/orders", async (req, res) => {
-  const userId = req.headers["x-user-id"];
-  const { restaurantId, items } = req.body;
-
-
-  // calculate price
-  const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
-  const order = new Order({
-    userId,
-    restaurantId,
-    items,
-    totalPrice
-  });
-
-  await order.save();
-  res.json({ message: "Order created", order });
-});
-
-// ----------- GET USER ORDER HISTORY -----------
-app.get("/orders/history", async (req, res) => {
-  const userId = req.headers["x-user-id"];
-  const orders = await Order.find({ userId });
-  res.json(orders);
-});
-
-// ----------- GET ORDER BY ID -----------
-app.get("/orders/:id", async (req, res) => {
-  const order = await Order.findById(req.params.id);
-  res.json(order);
-});
-
-
-
-
-
-
-
-// ----------- UPDATE ORDER STATUS  and send it to notification service----------- 
-app.put("/orders/:id/status", async (req, res) => {
-  try {
-    const { status } = req.body;
-    console.log("Updating order " + req.params.id + " status to:", status);
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true }
-    );
-
-    console.log("Updated order:", order);
-    if (!order) return res.status(404).json({ message: "Order not found" });
-    
-    // remove this if not needed
-     // --- NEW: Send notification to notification service ---
-    //  await axios.post("http://localhost:3005/notify", {
-    //     orderId: order._id,x
-    //    status: order.status
-    //  });
-
-    res.json({ message: "Status updated", order });
-  } catch (err) {
-    console.error("Update status error:", err);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-async function startServer() {
-  while (true) {
+async function connectWithRetry() {
+  for (let attempt = 1; attempt <= MAX_DB_ATTEMPTS; attempt += 1) {
     try {
-      await mongoose.connect(process.env.MONGO_URI, {
-        serverSelectionTimeoutMS: 3000,
-      });
+      await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 3000 });
       console.log("Order DB Connected");
-      break;
+      return;
     } catch (err) {
       console.error(
-        `Order DB connection failed (${err.message}). Retrying in ${DB_RETRY_DELAY_MS}ms...`
+        `Order DB connection failed (attempt ${attempt}/${MAX_DB_ATTEMPTS}): ${err.message}`
       );
+      if (attempt === MAX_DB_ATTEMPTS) throw err;
       await new Promise((resolve) => setTimeout(resolve, DB_RETRY_DELAY_MS));
     }
   }
-
-  app.listen(process.env.PORT, () =>
-    console.log(`Order Service running on port ${process.env.PORT}`)
-  );
 }
 
-startServer();
+async function startServer() {
+  // Bounded retry rather than an infinite loop: a service that can never reach
+  // its database should exit loudly so a supervisor can restart or alert, not
+  // spin silently forever.
+  await connectWithRetry();
+
+  const server = app.listen(PORT, () => console.log(`Order Service running on port ${PORT}`));
+
+  // Graceful shutdown: stop accepting new connections, finish in-flight
+  // requests, then close the DB pool. Without this, a deploy can drop requests.
+  async function shutdown(signal) {
+    console.log(`[order-service] ${signal} received, shutting down...`);
+    server.close(async () => {
+      await mongoose.connection.close(false);
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 10000).unref();
+  }
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+}
+
+startServer().catch((err) => {
+  console.error("Order service failed to start:", err.message);
+  process.exit(1);
+});

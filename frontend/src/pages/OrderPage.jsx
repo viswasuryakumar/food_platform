@@ -20,8 +20,8 @@ export default function OrderPage() {
   const [restaurant, setRestaurant] = useState(null);
   const [items, setItems] = useState([]);
   const [draftNotice, setDraftNotice] = useState("");
-  const [draftApplied, setDraftApplied] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -52,20 +52,13 @@ export default function OrderPage() {
   );
 
   useEffect(() => {
-    setDraftApplied(false);
     setDraftNotice("");
     setItems([]); // Clear cart when switching restaurants
   }, [restaurantId, location.key]);
 
   useEffect(() => {
     if (!restaurant) return;
-    
-    // If we have a draft from the location state, use it
-    if (!draftItems.length) {
-      // Only set applied true if we have no draft to process
-      setDraftApplied(true);
-      return;
-    }
+    if (!draftItems.length) return;
 
     // Process the draft items
     const menuByName = new Map(
@@ -97,9 +90,7 @@ export default function OrderPage() {
     } else if (draftItems.length > 0) {
       setDraftNotice("Couldn't map the assistant's items to this menu.");
     }
-
-    setDraftApplied(true);
-  }, [restaurant, draftItems, location.key]); // Use location.key to detect new navigations to same URL
+  }, [restaurant, draftItems, location.key]); // location.key detects re-navigation to the same URL
 
   function addItem(item) {
     const existing = items.find((i) => i.name === item.name);
@@ -139,24 +130,22 @@ export default function OrderPage() {
       return;
     }
 
+    setPlacing(true);
+    setError("");
     try {
-      const res = await api.post(
-        "/api/orders",
-        {
-          restaurantId,
-          items,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      // Only names and quantities are sent. The server prices the order from
+      // the restaurant's own menu, so a tampered price here would be ignored.
+      const res = await api.post("/api/orders", {
+        restaurantId,
+        items: items.map((item) => ({ name: item.name, quantity: item.quantity })),
+      });
 
       navigate(`/payment/${res.data.order._id}`);
     } catch (err) {
       console.error("Order failed:", err);
-      alert("Unable to place order right now.");
+      setError(err.apiMessage || "Unable to place order right now.");
+    } finally {
+      setPlacing(false);
     }
   }
 
@@ -245,9 +234,9 @@ export default function OrderPage() {
             <button
               onClick={placeOrder}
               className="btn-primary mt-4 w-full"
-              disabled={items.length === 0}
+              disabled={items.length === 0 || placing}
             >
-              Place Order
+              {placing ? "Placing order..." : "Place Order"}
             </button>
           </div>
         </aside>

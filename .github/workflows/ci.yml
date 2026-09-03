@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  # Callable from deploy.yml so a deployment is gated on a green build.
+  workflow_call:
+
+# A newer push supersedes an in-flight run on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-services:
+    name: test (${{ matrix.service.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      # Run every service even when one fails, so a single break does not hide
+      # the state of the others.
+      fail-fast: false
+      matrix:
+        service:
+          - { name: user-service, dir: services/user-service }
+          - { name: restaurant-service, dir: services/restaurant-service }
+          - { name: order-service, dir: services/order-service }
+          - { name: payment-service, dir: services/payment-service }
+          - { name: notification-service, dir: services/notification-service }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ matrix.service.dir }}/package-lock.json
+
+      # `npm ci` installs exactly the lockfile, so CI cannot silently drift onto
+      # a newer transitive dependency than the one that was reviewed.
+      - name: Install dependencies
+        working-directory: ${{ matrix.service.dir }}
+        run: npm ci
+
+      - name: Run tests
+        working-directory: ${{ matrix.service.dir }}
+        run: npm test
+        env:
+          # Tests use an in-memory MongoDB, so no external database is needed.
+          JWT_SECRET: ci-test-secret-not-used-in-production
+          INTERNAL_SERVICE_TOKEN: ci-internal-token
+
+  lint-and-build-frontend:
+    name: frontend (lint + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  gateway-smoke:
+    name: gateway (starts cleanly)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: api-gateway/package-lock.json
+
+      - name: Install dependencies
+        working-directory: api-gateway
+        run: npm ci
+
+      # The gateway has no unit tests of its own; this at least proves it boots
+      # and serves /health rather than crashing on a syntax or config error.
+      - name: Boot and probe health
+        working-directory: api-gateway
+        env:
+          PORT: 3000
+          JWT_SECRET: ci-test-secret
+        run: |
+          node index.js &
+          SERVER_PID=$!
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:3000/health > /dev/null; then
+              echo "Gateway is healthy"
+              kill $SERVER_PID
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Gateway failed to become healthy"
+          kill $SERVER_PID 2>/dev/null || true
+          exit 1
+
+  ci-passed:
+    name: CI passed
+    runs-on: ubuntu-latest
+    needs: [test-services, lint-and-build-frontend, gateway-smoke]
+    steps:
+      - run: echo "All CI checks passed."

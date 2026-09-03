@@ -1,16 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/axiosInstance";
-import { useSelector } from "react-redux";
 
 export default function PaymentPage() {
   const { orderId } = useParams();
   const navigate = useNavigate();
-  const { token } = useSelector((state) => state.auth);
 
   const [order, setOrder] = useState(null);
   const [method, setMethod] = useState("card");
   const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -18,41 +17,45 @@ export default function PaymentPage() {
       setLoading(true);
       setError("");
       try {
-        const res = await api.get(`/api/orders/${orderId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await api.get(`/api/orders/${orderId}`);
         setOrder(res.data);
       } catch (err) {
         console.error("Failed to fetch order:", err);
-        setError("Unable to load this order.");
+        setError(err.apiMessage || "Unable to load this order.");
       } finally {
         setLoading(false);
       }
     }
 
     fetchOrder();
-  }, [orderId, token]);
+  }, [orderId]);
+
+  /**
+   * Generated once per mounted checkout, so a double-click or a retry after a
+   * network blip reuses the same key and the server returns the original
+   * payment instead of charging twice.
+   */
+  const idempotencyKey = useMemo(() => `pay_${orderId}_${crypto.randomUUID()}`, [orderId]);
 
   async function handlePayment() {
-    if (!order) return;
+    if (!order || paying) return;
 
+    setPaying(true);
+    setError("");
     try {
+      // No `amount` is sent: the server charges the order's stored total.
       await api.post(
         "/api/payments/charge",
-        {
-          orderId,
-          amount: order.totalPrice,
-          method,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { orderId, method },
+        { headers: { "Idempotency-Key": idempotencyKey } }
       );
 
       navigate(`/track/${orderId}`);
     } catch (err) {
       console.error("Payment failed:", err);
-      alert("Payment failed. Please try again.");
+      setError(err.apiMessage || "Payment failed. Please try again.");
+    } finally {
+      setPaying(false);
     }
   }
 
@@ -107,7 +110,7 @@ export default function PaymentPage() {
               >
                 <option value="card">Credit / Debit Card</option>
                 <option value="upi">UPI</option>
-                <option value="netbanking">Net Banking</option>
+                <option value="wallet">Wallet</option>
               </select>
             </div>
 
@@ -118,8 +121,12 @@ export default function PaymentPage() {
                   ${Number(order.totalPrice).toFixed(2)}
                 </span>
               </p>
-              <button onClick={handlePayment} className="btn-primary mt-4 w-full">
-                Confirm Payment
+              <button
+                onClick={handlePayment}
+                className="btn-primary mt-4 w-full"
+                disabled={paying}
+              >
+                {paying ? "Processing..." : "Confirm Payment"}
               </button>
             </div>
           </aside>

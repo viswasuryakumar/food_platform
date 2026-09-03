@@ -4,6 +4,8 @@ services:
   # 1. User Service
   user:
     build: ./services/user-service
+    image: ${DOCKER_USERNAME:-local}/food-platform-user-service:latest
+    restart: unless-stopped
     ports:
       - "3001:3001"
     env_file: ./services/user-service/.env
@@ -13,6 +15,8 @@ services:
   # 2. Restaurant Service
   restaurant:
     build: ./services/restaurant-service
+    image: ${DOCKER_USERNAME:-local}/food-platform-restaurant-service:latest
+    restart: unless-stopped
     ports:
       - "3002:3002"
     env_file: ./services/restaurant-service/.env
@@ -22,6 +26,8 @@ services:
   # 3. Order Service
   order:
     build: ./services/order-service
+    image: ${DOCKER_USERNAME:-local}/food-platform-order-service:latest
+    restart: unless-stopped
     ports:
       - "3003:3003"
     env_file: ./services/order-service/.env
@@ -31,6 +37,8 @@ services:
   # 4. Payment Service
   payment:
     build: ./services/payment-service
+    image: ${DOCKER_USERNAME:-local}/food-platform-payment-service:latest
+    restart: unless-stopped
     ports:
       - "3004:3004"
     env_file: ./services/payment-service/.env
@@ -40,6 +48,8 @@ services:
   # 5. Notification Service
   notification:
     build: ./services/notification-service
+    image: ${DOCKER_USERNAME:-local}/food-platform-notification-service:latest
+    restart: unless-stopped
     ports:
       - "3005:3005"
     env_file: ./services/notification-service/.env
@@ -49,6 +59,8 @@ services:
   # 6. AI Agent Service
   ai:
     build: ./services/ai-agent
+    image: ${DOCKER_USERNAME:-local}/food-platform-ai-agent:latest
+    restart: unless-stopped
     ports:
       - "8000:8000"
     env_file: ./services/ai-agent/.env
@@ -56,6 +68,8 @@ services:
   # 7. API Gateway
   gateway:
     build: ./api-gateway
+    image: ${DOCKER_USERNAME:-local}/food-platform-api-gateway:latest
+    restart: unless-stopped
     ports:
       - "3000:3000"
     env_file: ./api-gateway/.env
@@ -66,17 +80,21 @@ services:
       - ORDER_SERVICE_URL=http://order:3003
       - PAYMENT_SERVICE_URL=http://payment:3004
       - NOTIFICATION_SERVICE_URL=http://notification:3005
+      - AI_SERVICE_URL=http://ai:8000
     depends_on:
       - user
       - restaurant
       - order
       - payment
       - notification
+      - ai
 
-  # 8. Frontend (Development Mode)
+  # 8. Frontend (production Nginx image)
   frontend:
     build: ./frontend
+    image: ${DOCKER_USERNAME:-local}/food-platform-frontend:latest
+    restart: unless-stopped
     ports:
-      - "5173:5173"
+      - "5173:80"
     depends_on:
       - gateway

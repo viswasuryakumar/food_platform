@@ -25,6 +25,7 @@ build/
 
 # VS Code settings
 .vscode/
+.claude/
 
 # Temporary files
 *.tmp

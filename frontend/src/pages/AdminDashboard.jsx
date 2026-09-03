@@ -1,11 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "../api/axiosInstance";
-import { useSelector } from "react-redux";
-
+import { adminActionsFor, STATUS_LABELS } from "../lib/orderStatus";
 
 export default function AdminDashboard() {
-  const token = useSelector((state) => state.auth.token);
-
   const [orders, setOrders] = useState([]);
   const [restaurants, setRestaurants] = useState([]);
   const [name, setName] = useState("");
@@ -14,66 +11,45 @@ export default function AdminDashboard() {
   const [menu, setMenu] = useState([]);
   const [itemName, setItemName] = useState("");
   const [itemPrice, setItemPrice] = useState("");
+  const [error, setError] = useState("");
 
-  async function fetchOrders() {
+  const fetchOrders = useCallback(async () => {
     try {
-      const res = await api.get("/api/orders", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setOrders(res.data || []);
+      const res = await api.get("/api/orders");
+      setOrders(res.data?.orders || []);
     } catch (err) {
       console.error("Fetch orders error:", err);
+      setError(err.apiMessage || "Could not load orders.");
     }
-  }
+  }, []);
 
-  async function fetchRestaurants() {
+  /** Only the restaurants this admin owns — not every restaurant on the platform. */
+  const fetchRestaurants = useCallback(async () => {
     try {
-      const res = await api.get("/api/restaurants");
-      setRestaurants(res.data || []);
+      const res = await api.get("/api/restaurants/mine/list");
+      setRestaurants(res.data?.restaurants || []);
     } catch (err) {
       console.error("Fetch restaurants error:", err);
+      setError(err.apiMessage || "Could not load your restaurants.");
     }
-  }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function bootstrapDashboard() {
-      try {
-        const [ordersRes, restaurantsRes] = await Promise.all([
-          api.get("/api/orders", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          api.get("/api/restaurants"),
-        ]);
-
-        if (cancelled) return;
-        setOrders(ordersRes.data || []);
-        setRestaurants(restaurantsRes.data || []);
-      } catch (err) {
-        console.error("Dashboard bootstrap error:", err);
-      }
-    }
-
-    bootstrapDashboard();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [token]);
+    // Data fetching on mount. The lint rule guards against synchronous
+    // setState cascades; these are async and settle after their await.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchOrders();
+    fetchRestaurants();
+  }, [fetchOrders, fetchRestaurants]);
 
   async function updateStatus(orderId, status) {
+    setError("");
     try {
-      await api.put(
-        `/api/orders/${orderId}/status`,
-        { status },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await api.put(`/api/orders/${orderId}/status`, { status });
       fetchOrders();
     } catch (err) {
       console.error("Update status error:", err);
+      setError(err.apiMessage || "Could not update that order.");
     }
   }
 
@@ -86,19 +62,9 @@ export default function AdminDashboard() {
   }
 
   async function createRestaurant() {
+    setError("");
     try {
-      await api.post(
-        "/api/restaurants",
-        {
-          name,
-          address,
-          cuisine,
-          menu,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await api.post("/api/restaurants", { name, address, cuisine, menu });
 
       setName("");
       setAddress("");
@@ -107,36 +73,34 @@ export default function AdminDashboard() {
       fetchRestaurants();
     } catch (err) {
       console.error("Create restaurant error:", err);
-      alert("Failed to create restaurant.");
+      setError(err.apiMessage || "Failed to create restaurant.");
     }
   }
 
   async function updateRestaurant(id) {
-    const newName = prompt("Enter new name");
+    const newName = window.prompt("Enter new name");
     if (!newName) return;
 
+    setError("");
     try {
-      await api.put(
-        `/api/restaurants/${id}`,
-        { name: newName },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await api.put(`/api/restaurants/${id}`, { name: newName });
       fetchRestaurants();
     } catch (err) {
       console.error("Update restaurant error:", err);
+      setError(err.apiMessage || "Could not update that restaurant.");
     }
   }
 
   async function deleteRestaurant(id) {
+    if (!window.confirm("Delete this restaurant and its menu?")) return;
+
+    setError("");
     try {
-      await api.delete(`/api/restaurants/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.delete(`/api/restaurants/${id}`);
       fetchRestaurants();
     } catch (err) {
       console.error("Delete restaurant error:", err);
+      setError(err.apiMessage || "Could not delete that restaurant.");
     }
   }
 
@@ -149,6 +113,12 @@ export default function AdminDashboard() {
           Manage restaurants and keep order statuses updated for customers.
         </p>
       </header>
+
+      {error && (
+        <p className="rounded-xl border border-[#e8c9bc] bg-[#f9e7df] px-4 py-3 text-sm text-[#8a4330]">
+          {error}
+        </p>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
         <section className="surface p-6">
@@ -258,32 +228,52 @@ export default function AdminDashboard() {
           <div className="surface p-6">
             <h2 className="text-xl font-semibold">Orders</h2>
             <div className="mt-4 space-y-3">
-              {orders.map((order) => (
-                <article key={order._id} className="surface-soft p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-medium text-[#75695d]">#{order._id}</p>
-                    <span className="status-pill">{order.status}</span>
-                  </div>
-                  <div className="mt-2 space-y-1 text-sm text-[#4a4036]">
-                    {order.items.map((item, i) => (
-                      <p key={i}>
-                        {item.name} x {item.quantity}
+              {orders.map((order) => {
+                // Only transitions the server will accept from this state are
+                // offered, so the dashboard cannot present a button that 409s.
+                const actions = adminActionsFor(order.status);
+
+                return (
+                  <article key={order._id} className="surface-soft p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-[#75695d]">#{order._id}</p>
+                      <span className="status-pill">
+                        {STATUS_LABELS[order.status] || order.status}
+                      </span>
+                    </div>
+                    <div className="mt-2 space-y-1 text-sm text-[#4a4036]">
+                      {order.items.map((item, i) => (
+                        <p key={i}>
+                          {item.name} x {item.quantity}
+                        </p>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-[#2e2721]">
+                      ${Number(order.totalPrice).toFixed(2)}
+                    </p>
+
+                    {actions.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {actions.map((next) => (
+                          <button
+                            key={next}
+                            onClick={() => updateStatus(order._id, next)}
+                            className={next === "delivered" ? "btn-primary" : "btn-soft"}
+                          >
+                            Mark {STATUS_LABELS[next]}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="muted mt-3 text-xs">
+                        {order.status === "pending"
+                          ? "Waiting for the customer to pay."
+                          : "No further action available."}
                       </p>
-                    ))}
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button onClick={() => updateStatus(order._id, "preparing")} className="btn-soft">
-                      Preparing
-                    </button>
-                    <button onClick={() => updateStatus(order._id, "on-the-way")} className="btn-soft">
-                      On the way
-                    </button>
-                    <button onClick={() => updateStatus(order._id, "delivered")} className="btn-primary">
-                      Delivered
-                    </button>
-                  </div>
-                </article>
-              ))}
+                    )}
+                  </article>
+                );
+              })}
               {orders.length === 0 && <p className="muted text-sm">No orders yet.</p>}
             </div>
           </div>

@@ -7,7 +7,8 @@
     "setup:env": "node scripts/setup.js --env-only",
     "dev": "node scripts/dev.js",
     "setup:run": "npm run setup && npm run dev",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node scripts/test-all.js",
+    "migrate": "node services/payment-service/migrations/001-backfill-idempotency-keys.js"
   },
   "keywords": [],
   "author": "",

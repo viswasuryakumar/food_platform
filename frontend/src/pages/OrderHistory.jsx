@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../api/axiosInstance";
 import { useSelector } from "react-redux";
+import { STATUS_LABELS } from "../lib/orderStatus";
 
 export default function OrderHistory() {
   const { token } = useSelector((state) => state.auth);
@@ -13,13 +15,12 @@ export default function OrderHistory() {
       setLoading(true);
       setError("");
       try {
-        const res = await api.get("/api/orders/history", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setOrders(res.data || []);
+        // The endpoint now returns a paginated envelope rather than a bare array.
+        const res = await api.get("/api/orders/history");
+        setOrders(res.data?.orders || []);
       } catch (err) {
         console.error("Failed to fetch order history:", err);
-        setError("Could not fetch order history.");
+        setError(err.apiMessage || "Could not fetch order history.");
       } finally {
         setLoading(false);
       }
@@ -66,7 +67,7 @@ export default function OrderHistory() {
                   <p className="text-xs uppercase tracking-wide text-[#8a7c6d]">Order ID</p>
                   <p className="text-sm font-semibold text-[#3d352d]">{order._id}</p>
                 </div>
-                <span className="status-pill">{order.status}</span>
+                <span className="status-pill">{STATUS_LABELS[order.status] || order.status}</span>
               </div>
 
               <div className="mt-4 grid gap-2">
@@ -80,6 +81,18 @@ export default function OrderHistory() {
                     </p>
                   </div>
                 ))}
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#eadfce] pt-3">
+                <p className="text-sm">
+                  <span className="muted">Total </span>
+                  <span className="font-semibold text-[#2e2721]">
+                    ${Number(order.totalPrice).toFixed(2)}
+                  </span>
+                </p>
+                <Link to={`/track/${order._id}`} className="btn-soft">
+                  Track order
+                </Link>
               </div>
             </article>
           ))}

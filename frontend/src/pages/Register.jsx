@@ -1,29 +1,39 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import api from "../api/axiosInstance";
+import { login } from "../redux/authSlice";
 
 export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   async function handleRegister(e) {
     e.preventDefault();
     setError("");
+    setFieldErrors([]);
+    setSubmitting(true);
 
     try {
-      await api.post("/api/auth/register", {
-        name,
-        email,
-        password,
-      });
+      const res = await api.post("/api/auth/register", { name, email, password });
 
-      navigate("/login");
+      // Registration now returns a token, so land the user straight in the app
+      // instead of bouncing them to the login form to retype credentials.
+      dispatch(login({ token: res.data.token, user: res.data.user }));
+      navigate("/restaurants");
     } catch (err) {
       console.error("Registration failed:", err);
-      setError("Could not create account. Try a different email.");
+      // Show the specific password/email rules that failed, not a generic message.
+      setFieldErrors(err.apiDetails || []);
+      setError(err.apiMessage || "Could not create account. Try a different email.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -38,9 +48,9 @@ export default function Register() {
           </p>
 
           <ul className="mt-8 space-y-3 text-sm text-[#5a4f44]">
-            <li className="surface-soft p-3">Order from seeded demo restaurants right away.</li>
+            <li className="surface-soft p-3">Browse restaurants and build an order in a few clicks.</li>
             <li className="surface-soft p-3">Track order status from pending to delivered.</li>
-            <li className="surface-soft p-3">Access admin tools with the seeded admin account.</li>
+            <li className="surface-soft p-3">Get live updates without repeatedly refreshing the page.</li>
           </ul>
         </div>
 
@@ -83,16 +93,26 @@ export default function Register() {
                 minLength={8}
                 required
               />
+              <p className="muted mt-1.5 text-xs">
+                Needs 8+ characters with an uppercase letter, a lowercase letter, and a number.
+              </p>
             </div>
 
             {error && (
-              <p className="rounded-xl border border-[#e8c9bc] bg-[#f9e7df] px-3 py-2 text-sm text-[#8a4330]">
-                {error}
-              </p>
+              <div className="rounded-xl border border-[#e8c9bc] bg-[#f9e7df] px-3 py-2 text-sm text-[#8a4330]">
+                <p>{error}</p>
+                {fieldErrors.length > 0 && (
+                  <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-xs">
+                    {fieldErrors.map((detail, i) => (
+                      <li key={i}>{detail.message}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
 
-            <button type="submit" className="btn-primary w-full">
-              Create account
+            <button type="submit" className="btn-primary w-full" disabled={submitting}>
+              {submitting ? "Creating account..." : "Create account"}
             </button>
           </form>
 

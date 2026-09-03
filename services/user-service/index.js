@@ -1,86 +1,55 @@
-require("dotenv").config();           // Load .env values
-const express = require("express");    // Import express
-const mongoose = require("mongoose");  // Import mongoose
-const cors = require("cors");          // Allow frontend requests
-const bcrypt = require("bcryptjs");    // To hash passwords
-const jwt = require("jsonwebtoken");   // To create JWT tokens
+require("dotenv").config();
+const mongoose = require("mongoose");
+const app = require("./app");
 
-const User = require("./models/User"); // Our User model
-
-const app = express();
-app.use(cors());
-app.use(express.json());
 mongoose.set("bufferCommands", false);
+
+const PORT = process.env.PORT || 3001;
 const DB_RETRY_DELAY_MS = Number(process.env.DB_RETRY_DELAY_MS || 2000);
+const MAX_DB_ATTEMPTS = Number(process.env.DB_MAX_ATTEMPTS || 15);
 
+// Fail fast and loudly rather than starting with an unsigned-token vulnerability.
+if (!process.env.JWT_SECRET) {
+  console.error("FATAL: JWT_SECRET is not set. Refusing to start.");
+  process.exit(1);
+}
 
-// ---------- REGISTER ROUTE ----------
-app.post("/auth/register", async (req, res) => {
-  const { name, email, password, role } = req.body;
-
-  // 1. Check if email already exists
-  const exists = await User.findOne({ email });
-  if (exists) return res.status(400).json({ message: "Email already exists" });
-
-  // 2. Hash the password
-  const hashed = await bcrypt.hash(password, 10);
-
-  // 3. Save user
-  const user = new User({ name, email, password: hashed, role: role || "user" });
-  await user.save();
-
-  res.json({ message: "User registered" });
-});
-
-
-// ---------- LOGIN ROUTE ----------
-app.post("/auth/login", async (req, res) => {
-  const { email, password } = req.body;
-
-  // 1. Check email
-  const user = await User.findOne({ email });
-  if (!user) return res.status(404).json({ message: "User not found" });
-
-  // 2. Compare password
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) return res.status(400).json({ message: "Wrong password" });
-
-  // 3. Create JWT token
-  const token = jwt.sign(
-    { id: user._id, email: user.email, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: "1d" }
-);
-
-
-  res.json({ token });
-});
-
-// Test route
-app.get("/", (req, res) => {
-  res.send("User Service Running");
-});
-
-async function startServer() {
-  while (true) {
+async function connectWithRetry() {
+  for (let attempt = 1; attempt <= MAX_DB_ATTEMPTS; attempt += 1) {
     try {
-      await mongoose.connect(process.env.MONGO_URI, {
-        serverSelectionTimeoutMS: 3000,
-      });
+      await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 3000 });
       console.log("User DB Connected");
-      break;
+      return;
     } catch (err) {
       console.error(
-        `User DB connection failed (${err.message}). Retrying in ${DB_RETRY_DELAY_MS}ms...`
+        `User DB connection failed (attempt ${attempt}/${MAX_DB_ATTEMPTS}): ${err.message}`
       );
+      if (attempt === MAX_DB_ATTEMPTS) throw err;
       await new Promise((resolve) => setTimeout(resolve, DB_RETRY_DELAY_MS));
     }
   }
-
-  app.listen(process.env.PORT, () =>
-    console.log(`User Service running on ${process.env.PORT}`)
-  );
 }
 
-startServer();
-    
+async function startServer() {
+  await connectWithRetry();
+  await require("./models/User").syncIndexes();
+
+  const server = app.listen(PORT, () => console.log(`User Service running on ${PORT}`));
+
+  async function shutdown(signal) {
+    console.log(`[user-service] ${signal} received, shutting down...`);
+    server.close(async () => {
+      await mongoose.connection.close(false);
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 10000).unref();
+  }
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+}
+
+startServer().catch((err) => {
+  console.error("User service failed to start:", err.message);
+  process.exit(1);
+});

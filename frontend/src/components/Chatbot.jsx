@@ -4,9 +4,11 @@ import { useSelector } from 'react-redux';
 import ReactMarkdown from 'react-markdown';
 import './Chatbot.css';
 
-const AI_BASE = 'http://localhost:8000';
+import { API_BASE } from '../api/axiosInstance';
 
-const INITIAL_MESSAGE = { text: "Hi! I'm your **AI Food Assistant**. Ask me anything — restaurants, prices, menu items!", sender: 'bot' };
+const AI_BASE = `${API_BASE}/api/ai`;
+
+const INITIAL_MESSAGE = { text: "Hi! I'm your **AI Food Assistant**. Ask me anything about restaurants, prices, or menu items.", sender: 'bot' };
 
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -52,7 +54,10 @@ const Chatbot = () => {
     try {
       const response = await fetch(`${AI_BASE}/chat/stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
         body: JSON.stringify({ message: userMessage, thread_id: threadId }),
       });
 
@@ -89,7 +94,7 @@ const Chatbot = () => {
                 if (redirectMatch[2]) {
                   try {
                     draftItems = JSON.parse(redirectMatch[2]);
-                  } catch (_) {
+                  } catch {
                     draftItems = [];
                   }
                 }
@@ -133,7 +138,7 @@ const Chatbot = () => {
                 return updated;
               });
             }
-          } catch (_) {
+          } catch {
             // Ignore JSON parse errors for partial chunks
           }
         }
@@ -143,7 +148,7 @@ const Chatbot = () => {
       setMessages(prev => {
         const updated = [...prev];
         updated[updated.length - 1] = {
-          text: "Sorry, I'm having trouble connecting to the AI service. Please ensure it's running on port 8000.",
+          text: "The assistant is temporarily unavailable. You can still browse restaurants and place an order normally.",
           sender: 'bot'
         };
         return updated;

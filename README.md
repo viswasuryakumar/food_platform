@@ -1,160 +1,142 @@
-# 🍔 Food Ordering Platform
+# CampusCrave
 
-> A scalable, microservices-based full-stack application for efficient digital food ordering, real-time tracking, and intelligent recommendations.
+CampusCrave is a full-stack campus food ordering platform built around a production-minded microservice architecture. Customers can discover restaurants, create an order, complete a retry-safe payment, and follow authenticated status updates in real time. Restaurant administrators manage their own menus and advance orders through a controlled workflow.
 
-## 📌 1. Problem Statement
+![CampusCrave product preview](frontend/public/campuscrave-hero.jpg)
 
-In modern environments such as workplaces, educational institutions, and public food courts, users frequently encounter inefficiencies in food ordering systems. These challenges include:
+## Why this project stands out
 
-- Long waiting times due to physical queues
-- Lack of a centralized platform to browse multiple vendors
-- Limited visibility into menu availability and order status
-- Inefficient communication between users and service providers
+- Six independently deployable backend services behind one API gateway
+- Authenticated WebSocket updates with reconnect and backoff behavior
+- Server-authoritative menu pricing to prevent client-side price tampering
+- Idempotent payments and database constraints that prevent duplicate charges
+- Explicit order state transitions with a complete status audit trail
+- Role-based access control, Zod validation, security headers, and rate limiting
+- Health and readiness checks for every deployed service
+- 128 automated API and unit tests, plus a deployment-blocking CI workflow
+- Responsive React interface with smart order drafting and an AI assistant
+- Installable PWA with offline shell support and mobile safe-area navigation
 
-These issues result in poor user experience, time inefficiencies, and reduced operational effectiveness.
+## Architecture
 
-## 💡 2. Proposed Solution
+```mermaid
+flowchart LR
+    UI[React + Vite] --> GW[API Gateway]
+    GW --> US[User Service]
+    GW --> RS[Restaurant Service]
+    GW --> OS[Order Service]
+    GW --> PS[Payment Service]
+    GW --> NS[Notification Service]
+    GW --> AI[AI Agent]
+    OS --> NS
+    PS --> OS
+    US --> DB[(MongoDB)]
+    RS --> DB
+    OS --> DB
+    PS --> DB
+    NS -. WebSocket .-> UI
+```
 
-The **Food Ordering Platform** provides a centralized, scalable, and user-friendly system that digitizes and optimizes the food ordering workflow.
+The gateway is the browser's only backend entry point. It verifies sessions, applies request limits, forwards HTTP traffic, and proxies WebSocket upgrades. Internal service mutations require a separate shared token.
 
-The platform enables users to:
+## Product flow
 
-- Browse restaurants and menus in real time
-- Place and manage orders digitally
-- Track order status dynamically
-- Perform seamless payment transactions
+1. Create an account or sign in.
+2. Search restaurants by name or cuisine.
+3. Select menu items or describe an order with Smart Order.
+4. Review the server-calculated total and place the order.
+5. Complete the simulated payment. Retries reuse an idempotency key.
+6. Follow live status updates and review the order timeline.
 
-Additionally, the system supports an **AI-powered recommendation engine** to enhance search, personalization, and user experience.
+Restaurant administrators have a separate dashboard for restaurant, menu, and order management.
 
----
-## 🏗️ 3. System Architecture Overview
-The platform follows a **microservices architecture** combined with an **API Gateway pattern**, ensuring modularity, scalability, and maintainability.
+## Technology
 
-🔄 Request Flow
+| Area | Stack |
+| --- | --- |
+| Frontend | React 19, Vite, Redux Toolkit, Tailwind CSS |
+| API | Node.js, Express, API Gateway pattern |
+| Data | MongoDB, Mongoose |
+| Real time | WebSockets |
+| AI | FastAPI, LangChain, LangGraph, OpenRouter/OpenAI-compatible API |
+| Quality | Jest, Supertest, ESLint, GitHub Actions |
+| Delivery | Docker, Docker Compose, Nginx, Docker Hub |
 
-User interacts with the Frontend UI.
+## Local development
 
-Requests are sent to the API Gateway.
+### Requirements
 
-The gateway routes requests to appropriate microservices.
+- Node.js 20+
+- Python 3.12+
+- MongoDB connection string
 
-Services interact with MongoDB for data persistence.
+### Setup
 
-Responses are returned via the gateway to the frontend.
-
-AI module (if enabled) enhances search and recommendations.
-
-## 🧩 4. Project Structure
-food_platform/
-|
-|-- api-gateway/        # Central routing and orchestration layer
-|-- services/           # Independent backend microservices
-|-- frontend/           # React-based user interface
-|-- scripts/            # Setup, database, and seeding utilities
-|-- package.json        # Root-level scripts and configuration
-`-- .env                # Environment variables
-## ⚙️ 5. Technology Stack
-Backend
-
-Node.js
-
-Express.js
-
-RESTful APIs
-
-Frontend
-
-React.js
-
-Vite
-
-Database
-
-MongoDB (NoSQL)
-
-Architecture
-
-Microservices architecture
-
-API Gateway pattern
-
-AI Integration
-
-OpenAI-based recommendation system
-
-## 🚀 6. Features
-
-Centralized restaurant browsing
-
-Real-time menu exploration
-
-Order placement and tracking
-
-Payment simulation
-
-Admin-level controls
-
-AI-powered intelligent search
-
-## 📋 7. Prerequisites
-
-Ensure the following are installed:
-
-Node.js (v16 or higher)
-
-MongoDB (running locally)
-
-## ▶️ 8. Installation & Setup
-Step 1: Clone Repository
+```bash
 git clone https://github.com/viswasuryakumar/food_platform.git
 cd food_platform
-Step 2: Install Dependencies
+copy .env.example .env
 npm run setup
-Step 3: Start Application
 npm run dev
-🌐 Access Points
+```
 
-Frontend: http://localhost:5173
+On macOS or Linux, use `cp .env.example .env` instead of `copy`.
 
-API Gateway: http://localhost:3000
+The application runs at:
 
-## 🤖 9. AI Configuration
+- Frontend: `http://localhost:5173`
+- API gateway: `http://localhost:3000`
+- Gateway health: `http://localhost:3000/health`
+- Dependency readiness: `http://localhost:3000/health/services`
 
-Update the following file:
+## Environment
 
-api-gateway/.env
+Copy `.env.example` to `.env` and set `MONGO_URI`. The setup script generates strong values for blank `JWT_SECRET` and `INTERNAL_SERVICE_TOKEN` fields and writes the service-specific environment files.
 
-Add:
+To enable the AI assistant, set `OPENROUTER_API_KEY` and optionally change `OPENROUTER_MODEL`. The rest of the ordering flow works without an AI key.
 
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_MODEL=gpt-4o-mini
+Never commit `.env` files or real credentials.
 
-Restart the application after updating.
+## Testing
 
-## ⚡ 10. Quick Commands
-Command	Description
-npm run setup	Install dependencies and generate .env files
-npm run dev	Run all services and frontend
-npm run setup:run	Setup and run in one command
+```bash
+npm test
+cd frontend
+npm run lint
+npm run build
+```
 
-## ⚠️ 11. Limitations
+The root test command runs all five Node service suites. CI runs those suites independently, lints and builds the frontend, and smoke-tests the gateway before deployment is allowed.
 
-Limited production-grade error handling
+## Deployment
 
-## 👥 12. Team
+The repository includes production Docker images and a GitHub Actions workflow for a Docker Compose host.
 
-Team Name: Team 4 - Mitochondria
+Required GitHub Actions secrets:
 
-Viswa Surya Kumar Suvvada
+| Secret | Purpose |
+| --- | --- |
+| `DOCKER_USERNAME` | Docker Hub namespace |
+| `DOCKER_TOKEN` | Docker Hub access token |
+| `VITE_API_URL` | Public HTTPS URL of the API gateway |
+| `DROPLET_HOST` | Deployment server hostname or IP |
+| `DROPLET_USER` | SSH user |
+| `DROPLET_SSH_KEY` | Private deployment key |
 
-Girith Choudary
+The server also needs a root `.env` containing `DOCKER_USERNAME` and service `.env` files generated from production values. A push to `main` runs CI, publishes only changed images, then updates the Compose deployment.
 
-Anil Kumar Bandaru
+For a public portfolio deployment, place a TLS reverse proxy in front of ports `5173` and `3000`, use a dedicated least-privilege MongoDB user, restrict inbound service ports, and configure `CORS_ORIGIN` to the exact frontend URL.
 
-Harsha Vardhan Badithaboina
+## Team
 
-Sanjushree Golla
+Team 4 — Mitochondria
 
-## 📌 13. Conclusion
+- Viswa Surya Kumar Suvvada
+- Girith Choudary
+- Anil Kumar Bandaru
+- Harsha Vardhan Badithaboina
+- Sanjushree Golla
 
-This project demonstrates the design and implementation of a modern, scalable food ordering system using microservices architecture. It integrates full-stack development principles with AI capabilities, making it suitable for real-world applications and future enhancements.
+## License
+
+This repository currently uses the ISC license declared in `package.json`.

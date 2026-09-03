@@ -169,7 +169,7 @@ export default function Restaurants() {
   const [assistantMessages, setAssistantMessages] = useState([]);
   const [assistantLoading, setAssistantLoading] = useState(false);
   const [draftOrder, setDraftOrder] = useState(null);
-  // Full catalog kept separately for Smart Order — never displayed in the grid
+  // Full catalog kept separately for Smart Order; never displayed in the grid.
   const [catalog, setCatalog] = useState([]);
 
   // Debounce: update `search` 300 ms after the user stops typing
@@ -254,6 +254,16 @@ export default function Restaurants() {
     setDraftOrder(draft);
   }
 
+  /**
+   * Smart Order runs entirely in the browser against the fetched catalog.
+   *
+   * This previously round-tripped to a gateway endpoint that did the same
+   * string matching server-side, duplicating the `buildDraft` logic already
+   * here, with worse quantity handling and no ambiguity detection. Removing
+   * that call deleted ~100 lines of gateway code and one network hop.
+   * The conversational AI assistant (Chatbot) is a separate, genuinely
+   * model-backed feature.
+   */
   async function handleAssistantSubmit(e) {
     e.preventDefault();
     const prompt = assistantPrompt.trim();
@@ -261,45 +271,7 @@ export default function Restaurants() {
 
     setAssistantLoading(true);
     try {
-      // Use the pre-fetched full catalog (with menus) for Smart Order
-      const catalogPayload = catalog.map((restaurant) => ({
-        _id: restaurant._id,
-        name: restaurant.name,
-        menu: (restaurant.menu || []).map((item) => ({
-          name: item.name,
-          price: Number(item.price) || 0,
-        })),
-      }));
-
-      const response = await api.post("/api/ai/smart-order", {
-        prompt,
-        restaurants: catalogPayload,
-      });
-
-      const data = response.data || {};
-      if (data.mode === "draft" && data.draft) {
-        setDraftOrder(data.draft);
-        pushAssistantMessages(
-          prompt,
-          data.assistantText ||
-            `Draft ready from ${data.draft.restaurant.name}. Review and place when ready.`
-        );
-      } else if (data.mode === "clarify") {
-        setDraftOrder(null);
-        pushAssistantMessages(
-          prompt,
-          data.clarification || "Please clarify your request with restaurant and menu item names."
-        );
-      } else {
-        applyLocalDraft(prompt);
-      }
-    } catch (err) {
-      console.error("Smart Order AI request failed:", err);
-      if (err?.response?.data?.code === "OPENAI_NOT_CONFIGURED") {
-        applyLocalDraft(prompt, "Smart Order AI:  ");
-      } else {
-        applyLocalDraft(prompt, "Smart Order AI: ");
-      }
+      applyLocalDraft(prompt);
     } finally {
       setAssistantPrompt("");
       setAssistantLoading(false);

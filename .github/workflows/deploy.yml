@@ -15,6 +15,7 @@ jobs:
       order-service: ${{ steps.filter.outputs.order-service }}
       payment-service: ${{ steps.filter.outputs.payment-service }}
       notification-service: ${{ steps.filter.outputs.notification-service }}
+      ai-agent: ${{ steps.filter.outputs.ai-agent }}
       frontend: ${{ steps.filter.outputs.frontend }}
     steps:
       - uses: actions/checkout@v4
@@ -34,11 +35,18 @@ jobs:
               - 'services/payment-service/**'
             notification-service:
               - 'services/notification-service/**'
+            ai-agent:
+              - 'services/ai-agent/**'
             frontend:
               - 'frontend/**'
 
+  # Deployment must not proceed on a red build. Previously this workflow pushed
+  # images and deployed to the droplet without running a single test.
+  test:
+    uses: ./.github/workflows/ci.yml
+
   build-and-push:
-    needs: detect-changes
+    needs: [detect-changes, test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -117,6 +125,17 @@ jobs:
           tags: ${{ secrets.DOCKER_USERNAME }}/food-platform-notification-service:latest
           cache-from: type=gha,scope=notification-service
           cache-to: type=gha,mode=max,scope=notification-service
+
+      - name: Build and push ai-agent
+        if: needs.detect-changes.outputs.ai-agent == 'true' || github.event_name == 'workflow_dispatch'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/ai-agent
+          platforms: linux/amd64
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/food-platform-ai-agent:latest
+          cache-from: type=gha,scope=ai-agent
+          cache-to: type=gha,mode=max,scope=ai-agent
 
       - name: Build and push frontend
         if: needs.detect-changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
